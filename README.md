@@ -1,207 +1,202 @@
-# Ledger Backend API
+# Water Refilling Ledger - Backend
 
-Backend API for Yaris Water Refilling Ledger built with Express.js, TypeScript, Prisma, and PostgreSQL.
+> **Part of Polyrepo**: [Frontend Repository](https://github.com/walaywashere/ledger-v2-frontend) | [Migration Guide](https://github.com/walaywashere/ledger-v2/blob/main/POLYREPO_MIGRATION.md)
 
-## Tech Stack
+Express.js + Prisma + PostgreSQL backend API for a family-run water refilling business sales tracking system.
 
-- **Runtime**: Node.js 18+
+## 🚀 Quick Start
+
+```bash
+# Clone repository
+git clone https://github.com/walaywashere/ledger-v2-backend.git
+cd ledger-v2-backend
+
+# Install dependencies
+npm install
+
+# Setup environment
+cp .env.example .env
+# Edit .env with your PostgreSQL credentials
+
+# Run migrations
+npx prisma migrate dev
+
+# Seed database (optional)
+npx prisma db seed
+
+# Start development server
+npm run dev
+```
+
+Server runs at: `http://localhost:3000`
+
+## 📦 Features
+
+### Authentication & Authorization
+- JWT tokens (15min access + 7day refresh)
+- Role-based access control (Admin/Staff)
+- Automatic token refresh
+- Session management
+
+### Core Modules
+- **Sales**: Track gallon sales with upsert behavior (one per customer per day)
+- **Customers**: Manage customer records with custom pricing
+- **Settings**: Key-value store for app configuration
+- **Users**: User management (max 3 concurrent users)
+- **Audit Logs**: Track all mutations for accountability
+
+### API Endpoints (34 total)
+- **Auth** (6): login, logout, refresh, me, register, change-password
+- **Sales** (11): CRUD + analytics (today, by-date, by-customer, stats)
+- **Customers** (8): CRUD + search, stats, history
+- **Settings** (8): CRUD + bulk operations
+- **Users** (7): CRUD + deactivation, current user
+
+## 🛠️ Tech Stack
+
+- **Runtime**: Node.js 20+ with TypeScript
 - **Framework**: Express.js
-- **Language**: TypeScript
-- **Database**: PostgreSQL 17+
-- **ORM**: Prisma
-- **Authentication**: JWT (Access + Refresh tokens)
-- **Validation**: Zod
+- **Database**: PostgreSQL 17+ via Prisma ORM
+- **Authentication**: JWT (jsonwebtoken) + bcrypt
+- **Validation**: Zod schemas
 - **Logging**: Winston
-- **Security**: Helmet, CORS, bcrypt
+- **Deployment**: Railway-ready
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 backend-v2/
 ├── src/
-│   ├── config/           # Configuration files (database, env, logger)
-│   ├── middleware/       # Express middleware (auth, error handler, validator, logger, cors)
-│   ├── modules/          # Feature modules (auth, customers, sales, settings, users)
-│   │   └── auth/         # Auth module with routes, controller, service, validators, types
-│   ├── utils/            # Helper utilities (errors, response formatters, pagination)
-│   ├── app.ts            # Express app configuration
-│   └── server.ts         # Server entry point
+│   ├── modules/          # Feature modules (auth, sales, customers, etc.)
+│   │   ├── auth/         # Authentication module
+│   │   ├── sales/        # Sales tracking
+│   │   ├── customers/    # Customer management
+│   │   ├── settings/     # App settings
+│   │   └── users/        # User management
+│   ├── middleware/       # Express middleware (auth, cors, error handling)
+│   ├── config/           # Configuration (database, env, logger)
+│   ├── utils/            # Utilities (errors, pagination, response)
+│   └── app.ts            # Express app setup
 ├── prisma/
-│   ├── schema.prisma     # Prisma schema with all models
-│   └── seed.ts           # Database seed script
-├── logs/                 # Application logs (gitignored)
-├── dist/                 # Compiled JavaScript (gitignored)
-├── .env                  # Environment variables (gitignored)
-├── .env.example          # Environment variable template
-├── package.json          # Dependencies and scripts
-└── tsconfig.json         # TypeScript configuration
+│   ├── schema.prisma     # Database schema
+│   ├── seed.ts           # Database seeder
+│   └── migrations/       # Migration history
+└── TESTING/              # API test plans and scripts
 ```
 
-## Setup Instructions
+## 🔧 Environment Variables
 
-### 1. Install Dependencies
+```bash
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/ledger"
 
-```powershell
-cd backend-v2
-npm install
+# JWT
+JWT_SECRET="your-secret-key-min-32-chars"
+JWT_REFRESH_SECRET="your-refresh-secret-key"
+
+# Server
+PORT=3000
+NODE_ENV=development
+
+# CORS
+CORS_ORIGIN="http://localhost:5173"
 ```
 
-### 2. Configure Environment
+## 📡 API Documentation
 
-Copy `.env.example` to `.env` and update the values:
-
-```powershell
-cp .env.example .env
-```
-
-Update `DATABASE_URL` with your PostgreSQL connection string.
-
-### 3. Setup Database
-
-Generate Prisma client:
-
-```powershell
-npm run prisma:generate
-```
-
-Run database migrations:
-
-```powershell
-npm run prisma:migrate
-```
-
-Seed initial data (admin user + default settings):
-
-```powershell
-npm run prisma:seed
-```
-
-**Default Admin User:**
-- Username: `admin`
-- Passcode: `000000`
-
-### 4. Start Development Server
-
-```powershell
-npm run dev
-```
-
-Server will run on `http://localhost:3000`
-
-## Available Scripts
-
-- `npm run dev` - Start development server with hot reload
-- `npm run build` - Build TypeScript to JavaScript
-- `npm start` - Start production server
-- `npm run prisma:generate` - Generate Prisma Client
-- `npm run prisma:migrate` - Run database migrations
-- `npm run prisma:studio` - Open Prisma Studio (database GUI)
-- `npm run prisma:seed` - Seed database with initial data
-
-## API Endpoints
+### Base URL
+- Development: `http://localhost:3000/api`
+- Production: `https://your-backend.railway.app/api`
 
 ### Authentication
+All endpoints except `/auth/login` and `/auth/register` require JWT token:
+```bash
+Authorization: Bearer <access_token>
+```
 
-- `POST /api/auth/login` - Login with username and passcode
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/logout` - Logout (invalidate session)
-- `GET /api/auth/me` - Get current user info (protected)
-- `POST /api/auth/change-password` - Change own password (protected)
-- `POST /api/auth/register` - Register new user (admin only)
-
-### Health Check
-
-- `GET /health` - Health check endpoint
-
-## Database Schema
-
-### Models
-
-- **User** - User accounts (max 3 users)
-- **Customer** - Customer records with location and optional custom pricing
-- **Sale** - Sale transactions linked to customer and user
-- **Setting** - Key-value settings (unitPrice, businessName)
-- **Session** - JWT refresh token sessions
-- **AuditLog** - Audit trail for all CRUD operations
-
-### Enums
-
-- **UserRole**: ADMIN, STAFF
-- **Location**: BANAI, DOUBE_L, JOVIL_3, LOWER_LOOB, PINATUBO, PLASTIKAN, SAN_ISIDRO, UPPER_LOOB, URBAN, ZUNIGA
-- **AuditAction**: CREATE, UPDATE, DELETE, LOGIN, LOGOUT
-
-## Authentication Flow
-
-1. **Login**: POST `/api/auth/login` with username + passcode
-   - Returns: `{ user, accessToken, refreshToken, expiresIn }`
-   - Access token expires in 15 minutes
-   - Refresh token expires in 7 days
-
-2. **Access Protected Routes**: Include `Authorization: Bearer <accessToken>` header
-
-3. **Refresh Token**: POST `/api/auth/refresh` with `refreshToken` body
-   - Returns new access token
-
-4. **Logout**: POST `/api/auth/logout` with `refreshToken` body
-   - Invalidates session
-
-## Error Handling
-
-All API responses follow a standard format:
-
-**Success Response:**
+### Response Format
 ```json
 {
   "success": true,
   "data": { ... },
-  "message": "Operation completed",
   "pagination": { ... }  // Optional for list endpoints
 }
 ```
 
-**Error Response:**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Error description",
-    "details": { ... }  // Optional
-  }
-}
+### Key Endpoints
+
+**Auth**
+- `POST /auth/login` - Login with username/passcode
+- `POST /auth/refresh` - Refresh access token
+- `GET /auth/me` - Get current user
+
+**Sales**
+- `GET /sales` - List all sales (paginated)
+- `POST /sales` - Create/update sale (upsert)
+- `GET /sales/today` - Get today's sales
+- `GET /sales/date/:date` - Get sales by date
+- `GET /sales/customer/:id` - Get customer's sales history
+
+**Customers**
+- `GET /customers` - List all customers (paginated)
+- `POST /customers` - Create customer
+- `GET /customers/:id` - Get customer details
+- `GET /customers/:id/stats` - Get customer statistics
+
+See [TESTING/](./TESTING/) for complete API documentation and test scripts.
+
+## 🧪 Testing
+
+```bash
+# Run API tests
+npm test
+
+# Manual testing with scripts
+node TESTING/quick-test-sales-api.js
+node TESTING/quick-test-customers-api.js
 ```
 
-## Development Notes
+## 🚢 Deployment
 
-- **File Size Rule**: Keep files ≤ 300 lines; extract to smaller modules when needed
-- **Layered Architecture**: Routes → Controllers → Services → Repositories → Database
-- **Validation**: All input validated with Zod schemas
-- **Error Handling**: Custom error classes with global error handler middleware
-- **Logging**: Winston logger with console + file transports
-- **Security**: JWT authentication, bcrypt password hashing, helmet middleware
+### Railway (Recommended)
+1. Create Railway project
+2. Add PostgreSQL plugin
+3. Connect GitHub repository
+4. Set environment variables
+5. Deploy!
 
-## Production Deployment
+See [RAILWAY_SETUP.md](./RAILWAY_SETUP.md) for detailed guide.
 
-1. Set `NODE_ENV=production` in environment
-2. Update `DATABASE_URL` to production PostgreSQL
-3. Generate strong random strings for `JWT_SECRET` and `JWT_REFRESH_SECRET` (min 64 chars)
-4. Run migrations: `npm run prisma:migrate`
-5. Build application: `npm run build`
-6. Start server: `npm start`
+### Other Platforms
+- Heroku
+- Render
+- AWS/GCP/Azure
+- Any Node.js hosting
 
-## Next Steps (Phase 2-5)
+## 🔗 Related Repositories
 
-- [ ] Implement Customers API (CRUD + stats)
-- [ ] Implement Sales API (CRUD + aggregations)
-- [ ] Implement Settings API (key-value store)
-- [ ] Implement Users API (admin management)
-- [ ] Implement Analytics API (dashboard, trends, CLV)
-- [ ] Implement Audit Logs API (trail of all actions)
-- [ ] Add comprehensive unit + integration tests
-- [ ] Performance optimization (indexes, caching)
-- [ ] Deploy to Railway with automated backups
+- **Frontend**: https://github.com/walaywashere/ledger-v2-frontend
+- **Migration Guide**: https://github.com/walaywashere/ledger-v2/blob/main/POLYREPO_MIGRATION.md
+
+## 📝 Development Notes
+
+### Architectural Decisions
+- **Layered Architecture**: Routes → Controllers → Services → Repository
+- **300-line Rule**: Keep files small and focused
+- **Response Adapters**: Consistent API response format
+- **Upsert Pattern**: One sale per customer per day (auto-updates)
+
+### Database Schema
+- Users: Admin/Staff roles with bcrypt passwords
+- Customers: Location-based with optional custom pricing
+- Sales: Linked to customers and users with audit trail
+- Settings: Key-value store with type validation
+- AuditLogs: Track all mutations with user/IP/changes
+
+## 📄 License
+
+MIT License - See LICENSE file for details
 
 ---
 
-**Status**: Phase 1 Complete ✅  
-**Next Phase**: Core APIs (Week 2)
+**Made for a family water refilling business** 💧
