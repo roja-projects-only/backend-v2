@@ -1,0 +1,155 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+enum Location {
+  BANAI
+  DOUBE_L
+  JOVIL_3
+  LOWER_LOOB
+  PINATUBO
+  PLASTIKAN
+  SAN_ISIDRO
+  UPPER_LOOB
+  URBAN
+  ZUNIGA
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  password      String    // bcrypt hashed
+  role          UserRole  @default(STAFF)
+  active        Boolean   @default(true)
+  
+  // Relations
+  sales         Sale[]
+  customers     Customer[]
+  auditLogs     AuditLog[]
+  sessions      Session[]
+  settingsUpdates Setting[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([username])
+}
+
+model Customer {
+  id              String    @id @default(cuid())
+  name            String
+  location        Location
+  phone           String?
+  customUnitPrice Float?    // Optional custom price per gallon (overrides global setting)
+  notes           String?
+  active          Boolean   @default(true)
+  
+  // Relations
+  sales           Sale[]
+  createdBy       User      @relation(fields: [createdById], references: [id])
+  createdById     String
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([name])
+  @@index([location])
+  @@index([createdById])
+}
+
+model Sale {
+  id          String    @id @default(cuid())
+  quantity    Float
+  unitPrice   Float
+  total       Float
+  date        DateTime
+  notes       String?
+  
+  // Relations
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId  String
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([customerId, date(sort: Asc)], name: "unique_customer_date")
+  @@index([customerId])
+  @@index([userId])
+  @@index([date])
+}
+
+model Setting {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  value     String
+  type      String    @default("string") // string, number, boolean, json
+  
+  // Relations
+  updatedBy User      @relation(fields: [updatedById], references: [id])
+  updatedById String
+  
+  updatedAt DateTime  @updatedAt
+  
+  @@index([key])
+}
+
+model Session {
+  id           String    @id @default(cuid())
+  token        String    @unique
+  refreshToken String    @unique
+  expiresAt    DateTime
+  
+  // Relations
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      AuditAction
+  entity      String      // "User", "Customer", "Sale", "Setting"
+  entityId    String
+  changes     Json?       // Before/after state
+  ipAddress   String?
+  userAgent   String?
+  
+  // Relations
+  user        User        @relation(fields: [userId], references: [id])
+  userId      String
+  
+  timestamp   DateTime    @default(now())
+  
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([timestamp])
+}
