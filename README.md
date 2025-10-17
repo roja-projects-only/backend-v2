@@ -167,6 +167,17 @@ node TESTING/quick-test-customers-api.js
 
 See [RAILWAY_SETUP.md](./RAILWAY_SETUP.md) for detailed guide.
 
+### Custom Pricing Feature
+The frontend supports **per-customer custom pricing** with a global toggle:
+- `Settings.enableCustomPricing` (boolean) controls the feature
+- `Customer.customUnitPrice` (optional decimal) stores custom price
+- When toggle is **OFF**: Frontend uses global `Settings.unitPrice` for all
+- When toggle is **ON**: Frontend uses `Customer.customUnitPrice` if set, else global
+- Backend stores both values; **frontend handles the pricing logic**
+- See frontend docs: `frontend-v2/docs/PRICING_GUIDE.md`
+
+## Production Deployment
+
 ### Other Platforms
 - Heroku
 - Render
