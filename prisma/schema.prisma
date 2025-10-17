@@ -25,6 +25,7 @@ enum Location {
   SAN_ISIDRO
   UPPER_LOOB
   URBAN
+  WALK_IN
   ZUNIGA
 }
 

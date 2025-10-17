@@ -42,6 +42,30 @@ async function main() {
     console.log(`✅ Created setting: ${created.key} = ${created.value}`);
   }
 
+  // Create Walk-In Customer
+  // Check if walk-in customer already exists by name
+  const existingWalkIn = await prisma.customer.findFirst({
+    where: { 
+      name: 'Walk-In Customer',
+      location: 'WALK_IN'
+    }
+  });
+
+  if (!existingWalkIn) {
+    const walkInCustomer = await prisma.customer.create({
+      data: {
+        name: 'Walk-In Customer',
+        location: 'WALK_IN',
+        phone: null,
+        customUnitPrice: null,
+        createdById: adminUser.id,
+      },
+    });
+    console.log('✅ Created Walk-In Customer:', walkInCustomer.name);
+  } else {
+    console.log('✅ Walk-In Customer already exists');
+  }
+
   console.log('🎉 Database seed completed!');
 }
 
