@@ -149,15 +149,46 @@ export class CustomersRepository {
       select: { date: true },
     });
 
+    // Get payment statistics
+    const payments = await prisma.payment.aggregate({
+      where: {
+        customerId: id,
+      },
+      _sum: {
+        paidAmount: true,
+      },
+      _count: true,
+    });
+
+    const lastPayment = await prisma.payment.findFirst({
+      where: { 
+        customerId: id,
+        paidAt: { not: null }
+      },
+      orderBy: { paidAt: 'desc' },
+      select: { paidAt: true },
+    });
+
+    // Get current outstanding balance
+    const customer = await prisma.customer.findUnique({
+      where: { id },
+      select: { outstandingBalance: true },
+    });
+
     const totalSales = sales._count || 0;
     const totalRevenue = sales._sum.total || 0;
     const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+    const totalPayments = payments._sum.paidAmount || 0;
+    const outstandingBalance = customer?.outstandingBalance || 0;
 
     return {
       totalSales,
       totalRevenue,
       lastPurchaseDate: lastSale?.date || null,
       averageOrderValue,
+      outstandingBalance,
+      totalPayments,
+      lastPaymentDate: lastPayment?.paidAt || null,
     };
   }
 

@@ -2,12 +2,11 @@ import { paymentsRepository } from './payments.repository';
 import { 
   CreatePaymentDTO, 
   UpdatePaymentDTO, 
-  PaymentFilters, 
-  RecordPaymentDTO,
+  PaymentFilters,
   PaymentSummary
 } from './payments.types';
 import { PaymentStatus, PaymentMethod, CollectionStatus } from '@prisma/client';
-import { NotFoundError, BadRequestError } from '../../utils/errors';
+import { NotFoundError, ValidationError } from '../../utils/errors';
 import { prisma } from '../../config/database';
 
 export class PaymentsService {
@@ -43,7 +42,7 @@ export class PaymentsService {
     }
 
     if (sale.payment) {
-      throw new BadRequestError('Payment already exists for this sale');
+      throw new ValidationError('Payment already exists for this sale');
     }
 
     // Check customer credit limit
@@ -61,7 +60,7 @@ export class PaymentsService {
 
     // Check credit limit
     if (customer.creditLimit && newOutstanding > customer.creditLimit) {
-      throw new BadRequestError(`Credit limit exceeded. Current: ₱${currentOutstanding}, Limit: ₱${customer.creditLimit}, Requested: ₱${amount}`);
+      throw new ValidationError(`Credit limit exceeded. Current: ₱${currentOutstanding}, Limit: ₱${customer.creditLimit}, Requested: ₱${amount}`);
     }
 
     // Create payment record
@@ -103,23 +102,23 @@ export class PaymentsService {
     }
 
     if (payment.status === PaymentStatus.PAID) {
-      throw new BadRequestError('Payment is already fully paid');
+      throw new ValidationError('Payment is already fully paid');
     }
 
     // Calculate remaining amount
     const remainingAmount = payment.amount - payment.paidAmount;
 
     if (amount <= 0) {
-      throw new BadRequestError('Payment amount must be greater than zero');
+      throw new ValidationError('Payment amount must be greater than zero');
     }
 
     if (amount > remainingAmount) {
-      throw new BadRequestError(`Payment amount (₱${amount}) exceeds remaining balance (₱${remainingAmount})`);
+      throw new ValidationError(`Payment amount (₱${amount}) exceeds remaining balance (₱${remainingAmount})`);
     }
 
     // Calculate new paid amount and status
     const newPaidAmount = payment.paidAmount + amount;
-    let newStatus = PaymentStatus.PARTIAL;
+    let newStatus: PaymentStatus = PaymentStatus.PARTIAL;
 
     if (newPaidAmount >= payment.amount) {
       newStatus = PaymentStatus.PAID;
@@ -131,7 +130,7 @@ export class PaymentsService {
       status: newStatus,
       paymentMethod,
       paidAt: new Date(),
-      notes: notes || payment.notes,
+      notes: notes || payment.notes || undefined,
     };
 
     const updatedPayment = await paymentsRepository.update(paymentId, updateData);
@@ -247,7 +246,7 @@ export class PaymentsService {
   async updateCustomerCollectionStatus(customerId: string) {
     const outstandingBalance = await this.calculateOutstandingBalance(customerId);
     
-    let newStatus = CollectionStatus.ACTIVE;
+    let newStatus: CollectionStatus = CollectionStatus.ACTIVE;
 
     if (outstandingBalance > 0) {
       // Check for overdue payments (30+ days)

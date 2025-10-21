@@ -2,12 +2,11 @@ import { prisma } from '../../config/database';
 import { 
   CreatePaymentDTO, 
   UpdatePaymentDTO, 
-  PaymentFilters, 
-  RecordPaymentDTO,
+  PaymentFilters,
   OutstandingBalance,
   AgingReportData
 } from './payments.types';
-import { PaymentStatus, PaymentMethod } from '@prisma/client';
+import { PaymentStatus } from '@prisma/client';
 
 export class PaymentsRepository {
   // Find all payments with filters
