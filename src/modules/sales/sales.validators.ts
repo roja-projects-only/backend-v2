@@ -15,6 +15,12 @@ export const createSaleSchema = z.object({
   notes: z.string()
     .max(500, 'Notes must be at most 500 characters')
     .optional(),
+  paymentType: z.enum(['CASH', 'CREDIT'])
+    .default('CASH')
+    .optional(),
+  adminOverride: z.boolean()
+    .default(false)
+    .optional(),
 });
 
 // Update sale validation schema
@@ -34,6 +40,8 @@ export const updateSaleSchema = z.object({
   notes: z.string()
     .max(500, 'Notes must be at most 500 characters')
     .nullable()
+    .optional(),
+  paymentType: z.enum(['CASH', 'CREDIT'])
     .optional(),
 });
 
@@ -73,4 +81,11 @@ export const dateParamSchema = z.object({
 export const dateRangeSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format'),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format'),
+});
+
+// Credit validation schema
+export const creditValidationSchema = z.object({
+  amount: z.number()
+    .positive('Amount must be positive')
+    .min(0.01, 'Amount must be at least 0.01'),
 });

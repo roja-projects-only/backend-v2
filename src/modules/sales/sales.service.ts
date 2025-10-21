@@ -3,6 +3,8 @@ import { salesRepository } from './sales.repository';
 import { prisma } from '../../config/database';
 import { AppError } from '../../utils/errors';
 import { logger } from '../../config/logger';
+import { paymentsService } from '../payments/payments.service';
+import { PaymentType } from '@prisma/client';
 
 export class SalesService {
   // List sales with filters
@@ -39,7 +41,7 @@ export class SalesService {
   }
 
   // Create sale (with upsert logic)
-  async createSale(data: CreateSaleDTO, userId: string) {
+  async createSale(data: CreateSaleDTO, userId: string, adminOverride: boolean = false) {
     // Validate customer exists
     const customer = await prisma.customer.findUnique({
       where: { id: data.customerId },
@@ -55,6 +57,17 @@ export class SalesService {
 
     // Calculate total: quantity × unitPrice
     const total = data.quantity * data.unitPrice;
+    const paymentType = data.paymentType || PaymentType.CASH;
+
+    // Credit limit validation for credit sales
+    let creditValidation = null;
+    if (paymentType === PaymentType.CREDIT) {
+      creditValidation = await paymentsService.validateCreditLimit(data.customerId, total);
+      
+      if (!creditValidation.allowed && !adminOverride) {
+        throw new AppError(400, `Credit limit exceeded. Current outstanding: ₱${creditValidation.currentOutstanding}, Credit limit: ₱${creditValidation.creditLimit}, Requested: ₱${total}. New total would be: ₱${creditValidation.newTotal}`);
+      }
+    }
 
     // Check if sale already exists for this customer on this date
     const existingSale = await salesRepository.findByCustomerAndDate(
@@ -70,9 +83,58 @@ export class SalesService {
           quantity: data.quantity,
           unitPrice: data.unitPrice,
           notes: data.notes,
+          paymentType,
         },
         total
       );
+
+      // Handle payment record for credit sales
+      if (paymentType === PaymentType.CREDIT) {
+        // Check if payment record exists
+        const existingPayment = await prisma.payment.findUnique({
+          where: { saleId: existingSale.id },
+        });
+
+        if (!existingPayment) {
+          // Create payment record for updated credit sale
+          await paymentsService.createCreditPayment(
+            existingSale.id,
+            total,
+            data.customerId,
+            userId
+          );
+        } else {
+          // Update existing payment record amount
+          await prisma.payment.update({
+            where: { id: existingPayment.id },
+            data: { amount: total },
+          });
+          
+          // Recalculate customer outstanding balance
+          await prisma.payment.findFirst({
+            where: { customerId: data.customerId },
+          }).then(() => {
+            return paymentsService.calculateOutstandingBalance(data.customerId);
+          }).then(async (newBalance) => {
+            await prisma.customer.update({
+              where: { id: data.customerId },
+              data: { outstandingBalance: newBalance },
+            });
+          });
+        }
+      } else if (existingSale.paymentType === PaymentType.CREDIT && paymentType === PaymentType.CASH) {
+        // Sale changed from credit to cash - remove payment record
+        await prisma.payment.deleteMany({
+          where: { saleId: existingSale.id },
+        });
+        
+        // Recalculate customer outstanding balance
+        const newBalance = await paymentsService.calculateOutstandingBalance(data.customerId);
+        await prisma.customer.update({
+          where: { id: data.customerId },
+          data: { outstandingBalance: newBalance },
+        });
+      }
 
       // Audit log for update
       await prisma.auditLog.create({
@@ -86,27 +148,43 @@ export class SalesService {
               unitPrice: existingSale.unitPrice,
               total: existingSale.total,
               notes: existingSale.notes,
+              paymentType: existingSale.paymentType,
             },
             after: {
               quantity: data.quantity,
               unitPrice: data.unitPrice,
               total,
               notes: data.notes,
+              paymentType,
             },
+            adminOverride,
+            creditValidation,
           } as any,
           userId,
         },
       });
 
-      logger.info(`Sale updated (upsert): ${existingSale.id} by user ${userId}`);
+      logger.info(`Sale updated (upsert): ${existingSale.id} by user ${userId}, paymentType: ${paymentType}`);
 
       return {
         ...updatedSale,
         wasUpdated: true,
+        creditWarning: creditValidation?.warningThreshold || false,
+        creditValidation,
       };
     } else {
       // CREATE new sale
       const sale = await salesRepository.create(data, userId, total);
+
+      // Create payment record for credit sales
+      if (paymentType === PaymentType.CREDIT) {
+        await paymentsService.createCreditPayment(
+          sale.id,
+          total,
+          data.customerId,
+          userId
+        );
+      }
 
       // Audit log for create
       await prisma.auditLog.create({
@@ -121,16 +199,21 @@ export class SalesService {
             total,
             date: data.date,
             notes: data.notes,
+            paymentType,
+            adminOverride,
+            creditValidation,
           } as any,
           userId,
         },
       });
 
-      logger.info(`Sale created: ${sale.id} by user ${userId}`);
+      logger.info(`Sale created: ${sale.id} by user ${userId}, paymentType: ${paymentType}`);
 
       return {
         ...sale,
         wasUpdated: false,
+        creditWarning: creditValidation?.warningThreshold || false,
+        creditValidation,
       };
     }
   }

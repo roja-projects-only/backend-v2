@@ -32,10 +32,37 @@ export class SalesController {
   // Create sale
   async createSale(req: AuthRequest, res: Response) {
     const data: CreateSaleDTO = req.body;
+    const adminOverride = req.body.adminOverride === true && req.user!.role === 'ADMIN';
 
-    const sale = await salesService.createSale(data, req.user!.userId);
+    const sale = await salesService.createSale(data, req.user!.userId, adminOverride);
 
-    sendSuccess(res, sale, 'Sale created successfully', 201);
+    // Prepare response with credit warnings if applicable
+    const response: any = {
+      ...sale,
+    };
+
+    // Add credit warning information to response
+    if (sale.creditWarning) {
+      response.warning = {
+        type: 'CREDIT_LIMIT_WARNING',
+        message: 'Customer is approaching credit limit (80% threshold)',
+        creditValidation: sale.creditValidation,
+      };
+    }
+
+    // Add payment status information
+    if (data.paymentType === 'CREDIT') {
+      response.paymentStatus = 'UNPAID';
+      response.paymentType = 'CREDIT';
+    } else {
+      response.paymentStatus = 'PAID';
+      response.paymentType = 'CASH';
+    }
+
+    const statusCode = sale.wasUpdated ? 200 : 201;
+    const message = sale.wasUpdated ? 'Sale updated successfully' : 'Sale created successfully';
+
+    sendSuccess(res, response, message, statusCode);
   }
 
   // Update sale
@@ -127,6 +154,37 @@ export class SalesController {
     );
 
     sendSuccess(res, summary, 'Sales summary retrieved successfully');
+  }
+
+  // Validate credit limit for customer
+  async validateCreditLimit(req: AuthRequest, res: Response) {
+    const { customerId } = req.params;
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid amount is required',
+      });
+    }
+
+    // Import paymentsService here to avoid circular dependency
+    const { paymentsService } = await import('../payments/payments.service');
+    
+    const validation = await paymentsService.validateCreditLimit(customerId, amount);
+
+    const response = {
+      ...validation,
+      recommendation: validation.allowed ? 'APPROVED' : 'DENIED',
+      warningMessage: validation.warningThreshold 
+        ? 'Customer is approaching credit limit (80% threshold)' 
+        : null,
+      errorMessage: !validation.allowed 
+        ? `Credit limit exceeded. Current: ₱${validation.currentOutstanding}, Limit: ₱${validation.creditLimit}, Requested: ₱${amount}` 
+        : null,
+    };
+
+    return sendSuccess(res, response, 'Credit limit validation completed');
   }
 }
 

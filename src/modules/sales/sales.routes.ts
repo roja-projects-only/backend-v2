@@ -10,7 +10,8 @@ import {
   customerIdParamSchema,
   dateParamSchema, 
   dateRangeSchema, 
-  saleFiltersSchema 
+  saleFiltersSchema,
+  creditValidationSchema
 } from './sales.validators';
 
 const router = Router();
@@ -64,6 +65,14 @@ router.get(
   '/customer/:customerId/history',
   validate(customerIdParamSchema, 'params'),
   asyncHandler(salesController.getCustomerHistory.bind(salesController))
+);
+
+// Validate credit limit for customer (POST /api/sales/customer/:customerId/validate-credit)
+router.post(
+  '/customer/:customerId/validate-credit',
+  validate(customerIdParamSchema, 'params'),
+  validate(creditValidationSchema),
+  asyncHandler(salesController.validateCreditLimit.bind(salesController))
 );
 
 // Get sale by ID (GET /api/sales/:id)
