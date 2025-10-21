@@ -16,12 +16,12 @@ export interface CustomerNeedingReminder {
   id: string;
   name: string;
   location: string;
-  phone?: string;
+  phone: string | null;
   outstandingBalance: number;
   collectionStatus: CollectionStatus;
   lastReminderDate?: Date;
   oldestDebtDate?: Date;
-  daysSinceLastReminder?: number;
+  daysSinceLastReminder: number | null;
 }
 
 export interface ReminderStats {
