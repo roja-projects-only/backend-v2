@@ -6,6 +6,7 @@ import { requestLogger } from './middleware/logger';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './modules/auth/auth.routes';
 import customersRoutes from './modules/customers/customers.routes';
+import paymentsRoutes from './modules/payments/payments.routes';
 import salesRoutes from './modules/sales/sales.routes';
 import settingsRoutes from './modules/settings/settings.routes';
 import usersRoutes from './modules/users/users.routes';
@@ -37,6 +38,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/customers', customersRoutes);
+app.use('/api/payments', paymentsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', usersRoutes);

@@ -235,32 +235,39 @@ export class PaymentsRepository {
 
   // Get customer payment history
   async getCustomerPaymentHistory(customerId: string, skip: number = 0, limit: number = 50) {
-    return prisma.payment.findMany({
-      where: { customerId },
-      skip,
-      take: limit,
-      include: {
-        sale: {
-          select: {
-            id: true,
-            quantity: true,
-            unitPrice: true,
-            total: true,
-            date: true,
-            paymentType: true,
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where: { customerId },
+        skip,
+        take: limit,
+        include: {
+          sale: {
+            select: {
+              id: true,
+              quantity: true,
+              unitPrice: true,
+              total: true,
+              date: true,
+              paymentType: true,
+            },
+          },
+          recordedBy: {
+            select: {
+              id: true,
+              username: true,
+            },
           },
         },
-        recordedBy: {
-          select: {
-            id: true,
-            username: true,
-          },
+        orderBy: {
+          createdAt: 'desc',
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+      }),
+      prisma.payment.count({
+        where: { customerId },
+      }),
+    ]);
+
+    return { payments, total };
   }
 
   // Calculate customer outstanding balance
