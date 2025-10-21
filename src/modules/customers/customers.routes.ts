@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { customersController } from './customers.controller';
+import { remindersController } from '../reminders/reminders.controller';
 import { authenticate, authorize } from '../../middleware/auth';
 import { validate, validateMultiple } from '../../middleware/validator';
 import { asyncHandler } from '../../middleware/asyncHandler';
@@ -9,6 +10,7 @@ import {
   customerFiltersSchema,
   customerIdSchema,
 } from './customers.validators';
+import { paginationSchema } from '../reminders/reminders.validators';
 import { UserRole } from '@prisma/client';
 
 const router = Router();
@@ -71,6 +73,21 @@ router.get(
   '/:id/stats',
   validate(customerIdSchema, 'params'),
   asyncHandler(customersController.getStats.bind(customersController))
+);
+
+// GET /api/customers/:id/reminders - Get customer reminder history
+router.get(
+  '/:id/reminders',
+  validate(customerIdSchema, 'params'),
+  validate(paginationSchema, 'query'),
+  asyncHandler(remindersController.getCustomerReminderHistory.bind(remindersController))
+);
+
+// GET /api/customers/:id/last-reminder - Get last reminder date for customer
+router.get(
+  '/:id/last-reminder',
+  validate(customerIdSchema, 'params'),
+  asyncHandler(remindersController.getLastReminderDate.bind(remindersController))
 );
 
 export default router;
