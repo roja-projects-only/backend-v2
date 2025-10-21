@@ -37,6 +37,29 @@ enum AuditAction {
   LOGOUT
 }
 
+enum PaymentStatus {
+  UNPAID      // Credit sale, no payment yet
+  PARTIAL     // Partially paid
+  PAID        // Fully paid
+  OVERDUE     // Past due date
+  COLLECTION  // In collection process
+}
+
+enum PaymentMethod {
+  CASH  // Only cash payments supported
+}
+
+enum PaymentType {
+  CASH    // Immediate payment
+  CREDIT  // Deferred payment
+}
+
+enum CollectionStatus {
+  ACTIVE      // Good standing
+  OVERDUE     // Past due, needs reminder
+  SUSPENDED   // Credit suspended
+}
+
 model User {
   id            String    @id @default(cuid())
   username      String    @unique
@@ -50,6 +73,8 @@ model User {
   auditLogs     AuditLog[]
   sessions      Session[]
   settingsUpdates Setting[]
+  payments      Payment[]
+  reminderNotes ReminderNote[]
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -65,9 +90,15 @@ model Customer {
   customUnitPrice Float?    // Optional custom price per gallon (overrides global setting)
   notes           String?
   active          Boolean   @default(true)
+  creditLimit     Float?    @default(1000) // Default ₱1000 credit limit
+  outstandingBalance Float  @default(0)    // Calculated field, updated on payment changes
+  lastPaymentDate DateTime?
+  collectionStatus CollectionStatus @default(ACTIVE)
   
   // Relations
   sales           Sale[]
+  payments        Payment[]
+  reminderNotes   ReminderNote[]
   createdBy       User      @relation(fields: [createdById], references: [id])
   createdById     String
   
@@ -77,6 +108,8 @@ model Customer {
   @@index([name])
   @@index([location])
   @@index([createdById])
+  @@index([collectionStatus])
+  @@index([outstandingBalance])
 }
 
 model Sale {
@@ -86,12 +119,14 @@ model Sale {
   total       Float
   date        DateTime
   notes       String?
+  paymentType PaymentType @default(CASH)
   
   // Relations
   customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   customerId  String
   user        User      @relation(fields: [userId], references: [id])
   userId      String
+  payment     Payment?  // One-to-one relationship
   
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -100,6 +135,7 @@ model Sale {
   @@index([customerId])
   @@index([userId])
   @@index([date])
+  @@index([paymentType])
 }
 
 model Setting {
@@ -153,4 +189,47 @@ model AuditLog {
   @@index([userId])
   @@index([entity, entityId])
   @@index([timestamp])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  amount        Float         // Amount owed or paid
+  status        PaymentStatus @default(UNPAID)
+  paymentMethod PaymentMethod?
+  paidAmount    Float         @default(0)
+  paidAt        DateTime?
+  dueDate       DateTime?     // When payment is expected
+  notes         String?
+  
+  // Relations
+  sale          Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId        String        @unique
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  customerId    String
+  recordedBy    User          @relation(fields: [recordedById], references: [id])
+  recordedById  String
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@index([customerId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model ReminderNote {
+  id            String    @id @default(cuid())
+  note          String
+  reminderDate  DateTime  @default(now())
+  
+  // Relations
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  customerId    String
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  createdById   String
+  
+  createdAt     DateTime  @default(now())
+  
+  @@index([customerId])
+  @@index([reminderDate])
 }
