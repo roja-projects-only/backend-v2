@@ -1,4 +1,4 @@
-import { Location } from '@prisma/client';
+import { Location, CollectionStatus } from '@prisma/client';
 
 // Create customer DTO
 export interface CreateCustomerDTO {
@@ -7,6 +7,7 @@ export interface CreateCustomerDTO {
   phone?: string;
   customUnitPrice?: number;
   notes?: string;
+  creditLimit?: number;
 }
 
 // Update customer DTO
@@ -17,6 +18,8 @@ export interface UpdateCustomerDTO {
   customUnitPrice?: number | null;
   notes?: string;
   active?: boolean;
+  creditLimit?: number | null;
+  collectionStatus?: CollectionStatus;
 }
 
 // Customer filters
@@ -34,6 +37,9 @@ export interface CustomerStats {
   totalRevenue: number;
   lastPurchaseDate: Date | null;
   averageOrderValue: number;
+  outstandingBalance: number;
+  totalPayments: number;
+  lastPaymentDate: Date | null;
 }
 
 // Customer with stats
@@ -45,6 +51,10 @@ export interface CustomerWithStats {
   customUnitPrice: number | null;
   notes: string | null;
   active: boolean;
+  creditLimit: number | null;
+  outstandingBalance: number;
+  lastPaymentDate: Date | null;
+  collectionStatus: CollectionStatus;
   createdAt: Date;
   updatedAt: Date;
   stats: CustomerStats;

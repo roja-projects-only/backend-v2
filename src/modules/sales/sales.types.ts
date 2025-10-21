@@ -1,3 +1,5 @@
+import { PaymentType } from '@prisma/client';
+
 // Create sale DTO
 export interface CreateSaleDTO {
   customerId: string;
@@ -5,6 +7,7 @@ export interface CreateSaleDTO {
   unitPrice: number;
   date: Date;
   notes?: string;
+  paymentType?: PaymentType;
 }
 
 // Update sale DTO
@@ -14,6 +17,7 @@ export interface UpdateSaleDTO {
   unitPrice?: number;
   date?: Date;
   notes?: string;
+  paymentType?: PaymentType;
 }
 
 // Sale filters
