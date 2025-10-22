@@ -41,6 +41,12 @@ router.get(
   asyncHandler(paymentsController.getCustomersWithOutstandingBalances.bind(paymentsController))
 );
 
+// Get payment summary/KPIs (GET /api/payments/summary)
+router.get(
+  '/summary',
+  asyncHandler(paymentsController.getPaymentSummary.bind(paymentsController))
+);
+
 // Get aging report (GET /api/reports/aging)
 router.get(
   '/reports/aging',

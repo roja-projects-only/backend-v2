@@ -181,6 +181,13 @@ export class PaymentsController {
     sendSuccess(res, response, 'Aging report retrieved successfully');
   }
 
+  // Get payment summary/KPIs (GET /api/payments/summary)
+  async getPaymentSummary(req: AuthRequest, res: Response): Promise<void> {
+    const summary = await paymentsService.getPaymentSummary();
+
+    sendSuccess(res, summary, 'Payment summary retrieved successfully');
+  }
+
   // Get daily payments report (GET /api/reports/payments/daily)
   async getDailyPaymentsReport(req: AuthRequest, res: Response): Promise<void> {
     const date = req.query.date as string || new Date().toISOString().split('T')[0];
