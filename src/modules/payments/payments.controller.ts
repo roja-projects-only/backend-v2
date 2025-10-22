@@ -57,6 +57,21 @@ export class PaymentsController {
     sendSuccess(res, payment, 'Payment recorded successfully', 201);
   }
 
+  // Record payment on payment ID (POST /api/payments/:id/record)
+  async recordPaymentById(req: AuthRequest, res: Response): Promise<void> {
+    const { amount, paymentMethod, notes } = req.body;
+
+    const payment = await paymentsService.recordPayment(
+      req.params.id,
+      amount,
+      paymentMethod,
+      req.user!.userId,
+      notes
+    );
+
+    sendSuccess(res, payment, 'Payment recorded successfully', 201);
+  }
+
   // Update payment (PUT /api/payments/:id)
   async updatePayment(req: AuthRequest, res: Response): Promise<void> {
     const data: UpdatePaymentDTO = req.body;

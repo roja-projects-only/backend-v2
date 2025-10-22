@@ -83,6 +83,15 @@ router.get(
   asyncHandler(paymentsController.getCustomerOutstandingBalance.bind(paymentsController))
 );
 
+// Record payment for payment ID (POST /api/payments/:id/record)
+// Convenience route for recording payment directly on payment ID
+router.post(
+  '/:id/record',
+  validate(paymentIdSchema, 'params'),
+  validate(recordPaymentSchema),
+  asyncHandler(paymentsController.recordPaymentById.bind(paymentsController))
+);
+
 // Get payment by ID (GET /api/payments/:id)
 // IMPORTANT: This must come AFTER all specific routes to avoid conflicts
 router.get(
