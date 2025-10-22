@@ -31,6 +31,13 @@ export const recordPaymentSchema = z.object({
   notes: z.string().max(500, 'Notes cannot exceed 500 characters').optional(),
 });
 
+// Record payment by ID validation (for POST /payments/:id/record route)
+export const recordPaymentByIdSchema = z.object({
+  amount: z.number().positive('Payment amount must be positive'),
+  paymentMethod: z.nativeEnum(PaymentMethod),
+  notes: z.string().max(500, 'Notes cannot exceed 500 characters').optional(),
+});
+
 // Update payment validation
 export const updatePaymentSchema = z.object({
   status: z.nativeEnum(PaymentStatus).optional(),

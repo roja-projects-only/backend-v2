@@ -9,6 +9,7 @@ import {
   customerIdParamSchema,
   paymentFiltersSchema,
   recordPaymentSchema,
+  recordPaymentByIdSchema,
   updatePaymentSchema,
   customerPaymentSchema,
   paginationSchema,
@@ -88,7 +89,7 @@ router.get(
 router.post(
   '/:id/record',
   validate(paymentIdSchema, 'params'),
-  validate(recordPaymentSchema),
+  validate(recordPaymentByIdSchema),
   asyncHandler(paymentsController.recordPaymentById.bind(paymentsController))
 );
 
