@@ -37,3 +37,4 @@ coverage/
 
 # Prisma
 prisma/.env
+.testing
