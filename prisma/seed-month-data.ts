@@ -105,14 +105,14 @@ async function seedMonthData() {
       console.log(`✅ Created customer: ${customer.name}`);
     }
 
-    // Generate sales for the past 30 days
+    // Generate sales for the past 120 days (to create proper aging buckets)
     console.log("\n📊 Generating sales data...");
 
     let totalSales = 0;
     let totalPaid = 0;
     let totalUnpaid = 0;
 
-    for (let day = 30; day >= 0; day--) {
+    for (let day = 120; day >= 0; day--) {
       const saleDate = daysAgo(day);
 
       // Each day, 3-5 random customers make purchases
@@ -151,8 +151,36 @@ async function seedMonthData() {
           let dueDate = new Date(saleDate);
           dueDate.setDate(dueDate.getDate() + 7); // Due in 7 days
 
-          if (day > 14) {
-            // Older sales (15-30 days ago): 60% paid, 30% overdue, 10% unpaid
+          if (day > 90) {
+            // Very old sales (90-120 days ago): 80% paid, 15% overdue, 5% collection
+            const rand = Math.random();
+            if (rand < 0.8) {
+              status = PaymentStatus.PAID;
+              paidAmount = total;
+              totalPaid += total;
+            } else if (rand < 0.95) {
+              status = PaymentStatus.OVERDUE;
+              totalUnpaid += total;
+            } else {
+              status = PaymentStatus.COLLECTION;
+              totalUnpaid += total;
+            }
+          } else if (day > 60) {
+            // Old sales (60-90 days ago): 70% paid, 25% overdue, 5% unpaid
+            const rand = Math.random();
+            if (rand < 0.7) {
+              status = PaymentStatus.PAID;
+              paidAmount = total;
+              totalPaid += total;
+            } else if (rand < 0.95) {
+              status = PaymentStatus.OVERDUE;
+              totalUnpaid += total;
+            } else {
+              status = PaymentStatus.UNPAID;
+              totalUnpaid += total;
+            }
+          } else if (day > 30) {
+            // Medium-old sales (30-60 days ago): 60% paid, 30% overdue, 10% unpaid
             const rand = Math.random();
             if (rand < 0.6) {
               status = PaymentStatus.PAID;
@@ -165,14 +193,28 @@ async function seedMonthData() {
               status = PaymentStatus.UNPAID;
               totalUnpaid += total;
             }
+          } else if (day > 14) {
+            // Older sales (15-30 days ago): 50% paid, 40% unpaid, 10% overdue
+            const rand = Math.random();
+            if (rand < 0.5) {
+              status = PaymentStatus.PAID;
+              paidAmount = total;
+              totalPaid += total;
+            } else if (rand < 0.9) {
+              status = PaymentStatus.UNPAID;
+              totalUnpaid += total;
+            } else {
+              status = PaymentStatus.OVERDUE;
+              totalUnpaid += total;
+            }
           } else if (day > 7) {
-            // Medium age (8-14 days ago): 40% paid, 40% unpaid, 20% overdue
+            // Medium age (8-14 days ago): 40% paid, 50% unpaid, 10% overdue
             const rand = Math.random();
             if (rand < 0.4) {
               status = PaymentStatus.PAID;
               paidAmount = total;
               totalPaid += total;
-            } else if (rand < 0.8) {
+            } else if (rand < 0.9) {
               status = PaymentStatus.UNPAID;
               totalUnpaid += total;
             } else {
@@ -302,12 +344,16 @@ async function seedMonthData() {
     const salesCount = await prisma.sale.count();
     const paymentsCount = await prisma.payment.count();
     const transactionsCount = await prisma.paymentTransaction.count();
+    const overdueCount = await prisma.payment.count({
+      where: { status: { in: ["OVERDUE", "COLLECTION"] } },
+    });
 
     console.log(`  Sales Records: ${salesCount}`);
     console.log(`  Payment Records: ${paymentsCount}`);
     console.log(`  Payment Transactions: ${transactionsCount}`);
+    console.log(`  Overdue Payments: ${overdueCount}`);
 
-    console.log("\n🎉 Month data seeded successfully!");
+    console.log("\n🎉 120-day data seeded successfully!");
   } catch (error) {
     console.error("❌ Error seeding month data:", error);
     throw error;
