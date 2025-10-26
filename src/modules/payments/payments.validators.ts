@@ -66,3 +66,20 @@ export const paginationSchema = z.object({
 export const dailyReportSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
 });
+
+// Payment transaction ID parameter validation
+export const transactionIdSchema = z.object({
+  id: z.string().cuid('Invalid transaction ID format'),
+});
+
+// Create payment transaction validation
+export const createPaymentTransactionSchema = z.object({
+  amount: z.number().positive('Transaction amount must be positive'),
+  paymentMethod: z.nativeEnum(PaymentMethod),
+  notes: z.string().max(500, 'Notes cannot exceed 500 characters').optional(),
+});
+
+// Update payment transaction validation
+export const updatePaymentTransactionSchema = z.object({
+  notes: z.string().max(500, 'Notes cannot exceed 500 characters').optional(),
+});

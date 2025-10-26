@@ -245,6 +245,64 @@ export class PaymentsController {
 
     sendSuccess(res, response, 'Daily payments report retrieved successfully');
   }
+
+  // Create payment transaction (POST /api/payments/:id/transactions)
+  async createPaymentTransaction(req: AuthRequest, res: Response): Promise<void> {
+    const paymentId = req.params.id;
+    const { amount, paymentMethod, notes } = req.body;
+
+    const updatedPayment = await paymentsService.recordPayment(
+      paymentId,
+      amount,
+      paymentMethod,
+      req.user!.userId,
+      notes
+    );
+
+    sendSuccess(res, updatedPayment, 'Payment transaction recorded successfully', 201);
+  }
+
+  // Get payment transactions (GET /api/payments/:id/transactions)
+  async getPaymentTransactions(req: AuthRequest, res: Response): Promise<void> {
+    const paymentId = req.params.id;
+
+    const transactions = await paymentsService.getPaymentTransactionHistory(paymentId);
+
+    const response = {
+      paymentId,
+      transactions,
+      totalTransactions: transactions.length,
+      totalPaid: transactions.reduce((sum, t) => sum + t.amount, 0),
+    };
+
+    sendSuccess(res, response, 'Payment transactions retrieved successfully');
+  }
+
+  // Update payment transaction notes (PUT /api/payments/transactions/:id)
+  async updatePaymentTransaction(req: AuthRequest, res: Response): Promise<void> {
+    const transactionId = req.params.id;
+    const { notes } = req.body;
+
+    const transaction = await paymentsService.updatePaymentTransaction(
+      transactionId,
+      { notes },
+      req.user!.userId
+    );
+
+    sendSuccess(res, transaction, 'Payment transaction updated successfully');
+  }
+
+  // Delete payment transaction (DELETE /api/payments/transactions/:id) - Admin only
+  async deletePaymentTransaction(req: AuthRequest, res: Response): Promise<void> {
+    const transactionId = req.params.id;
+
+    const result = await paymentsService.deletePaymentTransaction(
+      transactionId,
+      req.user!.userId
+    );
+
+    sendSuccess(res, null, result.message);
+  }
 }
 
 export const paymentsController = new PaymentsController();

@@ -148,3 +148,49 @@ export interface ReminderNoteWithRelations {
     username: string;
   };
 }
+
+// Payment transaction DTOs
+export interface CreatePaymentTransactionDTO {
+  paymentId: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  notes?: string;
+}
+
+export interface UpdatePaymentTransactionDTO {
+  notes?: string;
+}
+
+// Payment transaction with relations
+export interface PaymentTransactionWithRelations {
+  id: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  notes: string | null;
+  paymentId: string;
+  recordedById: string;
+  createdAt: Date;
+
+  // Relations
+  payment?: {
+    id: string;
+    amount: number;
+    status: PaymentStatus;
+    paidAmount: number;
+    customerId: string;
+    customer?: {
+      id: string;
+      name: string;
+      location: string;
+    };
+  };
+  recordedBy?: {
+    id: string;
+    username: string;
+  };
+}
+
+// Payment transaction with running balance
+export interface PaymentTransactionWithBalance extends PaymentTransactionWithRelations {
+  runningBalance: number; // Remaining balance after this transaction
+}

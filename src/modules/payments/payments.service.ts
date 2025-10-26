@@ -1,9 +1,11 @@
-import { paymentsRepository } from './payments.repository';
+import { paymentsRepository, paymentTransactionRepository } from './payments.repository';
 import { 
   CreatePaymentDTO, 
   UpdatePaymentDTO, 
   PaymentFilters,
-  PaymentSummary
+  PaymentSummary,
+  CreatePaymentTransactionDTO,
+  UpdatePaymentTransactionDTO
 } from './payments.types';
 import { PaymentStatus, PaymentMethod, CollectionStatus } from '@prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
@@ -93,7 +95,7 @@ export class PaymentsService {
     return payment;
   }
 
-  // Record payment received (cash payment)
+  // Record payment received (cash payment) - Creates PaymentTransaction
   async recordPayment(paymentId: string, amount: number, paymentMethod: PaymentMethod, userId: string, notes?: string) {
     const payment = await paymentsRepository.findById(paymentId);
 
@@ -116,21 +118,30 @@ export class PaymentsService {
       throw new ValidationError(`Payment amount (₱${amount}) exceeds remaining balance (₱${remainingAmount})`);
     }
 
-    // Calculate new paid amount and status
-    const newPaidAmount = payment.paidAmount + amount;
+    // Create payment transaction record
+    const transactionData: CreatePaymentTransactionDTO = {
+      paymentId,
+      amount,
+      paymentMethod,
+      notes,
+    };
+
+    const transaction = await paymentTransactionRepository.create(transactionData, userId);
+
+    // Calculate new paid amount from all transactions
+    const totalPaid = await paymentTransactionRepository.sumByPaymentId(paymentId);
     let newStatus: PaymentStatus = PaymentStatus.PARTIAL;
 
-    if (newPaidAmount >= payment.amount) {
+    if (totalPaid >= payment.amount) {
       newStatus = PaymentStatus.PAID;
     }
 
-    // Update payment
+    // Update payment with new totals
     const updateData: UpdatePaymentDTO = {
-      paidAmount: newPaidAmount,
+      paidAmount: totalPaid,
       status: newStatus,
       paymentMethod,
       paidAt: new Date(),
-      notes: notes || payment.notes || undefined,
     };
 
     const updatedPayment = await paymentsRepository.update(paymentId, updateData);
@@ -151,13 +162,16 @@ export class PaymentsService {
     await prisma.auditLog.create({
       data: {
         userId,
-        action: 'UPDATE',
-        entity: 'Payment',
-        entityId: payment.id,
+        action: 'CREATE',
+        entity: 'PaymentTransaction',
+        entityId: transaction.id,
         changes: {
-          before: payment,
-          after: updateData,
-          paymentReceived: amount,
+          paymentId,
+          amount,
+          paymentMethod,
+          notes,
+          newPaidAmount: totalPaid,
+          newStatus,
         } as any,
       },
     });
@@ -454,6 +468,100 @@ export class PaymentsService {
     });
 
     return transactions;
+  }
+
+  // Get payment transaction history for a payment
+  async getPaymentTransactionHistory(paymentId: string) {
+    // Verify payment exists
+    const payment = await paymentsRepository.findById(paymentId);
+    if (!payment) {
+      throw new NotFoundError('Payment');
+    }
+
+    return paymentTransactionRepository.getTransactionsWithRunningBalance(paymentId);
+  }
+
+  // Get payment transaction by ID
+  async getPaymentTransactionById(id: string) {
+    const transaction = await paymentTransactionRepository.findById(id);
+    if (!transaction) {
+      throw new NotFoundError('PaymentTransaction');
+    }
+
+    return transaction;
+  }
+
+  // Update payment transaction notes
+  async updatePaymentTransaction(id: string, data: UpdatePaymentTransactionDTO, userId: string) {
+    const existing = await paymentTransactionRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundError('PaymentTransaction');
+    }
+
+    const transaction = await paymentTransactionRepository.update(id, data);
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'UPDATE',
+        entity: 'PaymentTransaction',
+        entityId: transaction.id,
+        changes: {
+          before: existing,
+          after: data,
+        } as any,
+      },
+    });
+
+    return transaction;
+  }
+
+  // Delete payment transaction (admin only)
+  async deletePaymentTransaction(id: string, userId: string) {
+    const existing = await paymentTransactionRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundError('PaymentTransaction');
+    }
+
+    const paymentId = existing.paymentId;
+
+    await paymentTransactionRepository.delete(id);
+
+    // Recalculate payment totals
+    const payment = await paymentsRepository.findById(paymentId);
+    if (payment) {
+      const totalPaid = await paymentTransactionRepository.sumByPaymentId(paymentId);
+      let newStatus: PaymentStatus = PaymentStatus.UNPAID;
+
+      if (totalPaid > 0 && totalPaid < payment.amount) {
+        newStatus = PaymentStatus.PARTIAL;
+      } else if (totalPaid >= payment.amount) {
+        newStatus = PaymentStatus.PAID;
+      }
+
+      await paymentsRepository.update(paymentId, {
+        paidAmount: totalPaid,
+        status: newStatus,
+      });
+
+      // Update customer outstanding balance
+      await paymentsRepository.updateCustomerOutstandingBalance(payment.customerId);
+      await this.updateCustomerCollectionStatus(payment.customerId);
+    }
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'DELETE',
+        entity: 'PaymentTransaction',
+        entityId: existing.id,
+        changes: { deleted: existing } as any,
+      },
+    });
+
+    return { message: 'Payment transaction deleted successfully' };
   }
 }
 

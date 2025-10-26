@@ -14,6 +14,9 @@ import {
   customerPaymentSchema,
   paginationSchema,
   dailyReportSchema,
+  transactionIdSchema,
+  createPaymentTransactionSchema,
+  updatePaymentTransactionSchema,
 } from './payments.validators';
 
 const router = Router();
@@ -91,6 +94,37 @@ router.post(
   validate(paymentIdSchema, 'params'),
   validate(recordPaymentByIdSchema),
   asyncHandler(paymentsController.recordPaymentById.bind(paymentsController))
+);
+
+// Create payment transaction (POST /api/payments/:id/transactions)
+router.post(
+  '/:id/transactions',
+  validate(paymentIdSchema, 'params'),
+  validate(createPaymentTransactionSchema),
+  asyncHandler(paymentsController.createPaymentTransaction.bind(paymentsController))
+);
+
+// Get payment transactions (GET /api/payments/:id/transactions)
+router.get(
+  '/:id/transactions',
+  validate(paymentIdSchema, 'params'),
+  asyncHandler(paymentsController.getPaymentTransactions.bind(paymentsController))
+);
+
+// Update payment transaction notes (PUT /api/payments/transactions/:id)
+router.put(
+  '/transactions/:id',
+  validate(transactionIdSchema, 'params'),
+  validate(updatePaymentTransactionSchema),
+  asyncHandler(paymentsController.updatePaymentTransaction.bind(paymentsController))
+);
+
+// Delete payment transaction (DELETE /api/payments/transactions/:id) - Admin only
+router.delete(
+  '/transactions/:id',
+  validate(transactionIdSchema, 'params'),
+  authorize(UserRole.ADMIN),
+  asyncHandler(paymentsController.deletePaymentTransaction.bind(paymentsController))
 );
 
 // Get payment by ID (GET /api/payments/:id)

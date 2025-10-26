@@ -4,7 +4,10 @@ import {
   UpdatePaymentDTO, 
   PaymentFilters,
   OutstandingBalance,
-  AgingReportData
+  AgingReportData,
+  CreatePaymentTransactionDTO,
+  UpdatePaymentTransactionDTO,
+  PaymentTransactionWithBalance
 } from './payments.types';
 import { PaymentStatus } from '@prisma/client';
 
@@ -152,6 +155,19 @@ export class PaymentsRepository {
             username: true,
           },
         },
+        transactions: {
+          include: {
+            recordedBy: {
+              select: {
+                id: true,
+                username: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
     });
   }
@@ -255,6 +271,19 @@ export class PaymentsRepository {
             select: {
               id: true,
               username: true,
+            },
+          },
+          transactions: {
+            include: {
+              recordedBy: {
+                select: {
+                  id: true,
+                  username: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'asc',
             },
           },
         },
@@ -527,5 +556,240 @@ export class PaymentsRepository {
     };
   }
 }
+
+// PaymentTransaction Repository
+export class PaymentTransactionRepository {
+  // Create payment transaction
+  async create(data: CreatePaymentTransactionDTO, recordedById: string) {
+    return prisma.paymentTransaction.create({
+      data: {
+        ...data,
+        recordedById,
+      },
+      include: {
+        payment: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                location: true,
+              },
+            },
+          },
+        },
+        recordedBy: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+    });
+  }
+
+  // Get all transactions for a payment
+  async findByPaymentId(paymentId: string) {
+    return prisma.paymentTransaction.findMany({
+      where: { paymentId },
+      include: {
+        recordedBy: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+  }
+
+  // Get transaction by ID
+  async findById(id: string) {
+    return prisma.paymentTransaction.findUnique({
+      where: { id },
+      include: {
+        payment: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                location: true,
+              },
+            },
+          },
+        },
+        recordedBy: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+    });
+  }
+
+  // Update transaction notes
+  async update(id: string, data: UpdatePaymentTransactionDTO) {
+    return prisma.paymentTransaction.update({
+      where: { id },
+      data,
+      include: {
+        payment: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                location: true,
+              },
+            },
+          },
+        },
+        recordedBy: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+    });
+  }
+
+  // Delete transaction (admin only)
+  async delete(id: string) {
+    return prisma.paymentTransaction.delete({
+      where: { id },
+    });
+  }
+
+  // Calculate running balance after each transaction
+  async getTransactionsWithRunningBalance(paymentId: string): Promise<PaymentTransactionWithBalance[]> {
+    // Get payment details
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: {
+        amount: true,
+        status: true,
+        paidAmount: true,
+        customerId: true,
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            location: true,
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      return [];
+    }
+
+    // Get all transactions for this payment
+    const transactions = await prisma.paymentTransaction.findMany({
+      where: { paymentId },
+      include: {
+        recordedBy: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    // Calculate running balance for each transaction
+    let cumulativePaid = 0;
+    const transactionsWithBalance: PaymentTransactionWithBalance[] = transactions.map(transaction => {
+      cumulativePaid += transaction.amount;
+      const runningBalance = payment.amount - cumulativePaid;
+
+      return {
+        ...transaction,
+        payment: {
+          id: paymentId,
+          amount: payment.amount,
+          status: payment.status,
+          paidAmount: payment.paidAmount,
+          customerId: payment.customerId,
+          customer: payment.customer,
+        },
+        runningBalance: Math.max(0, runningBalance),
+      };
+    });
+
+    return transactionsWithBalance;
+  }
+
+  // Get transactions filtered by date range
+  async findByDateRange(startDate: Date, endDate: Date) {
+    return prisma.paymentTransaction.findMany({
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        payment: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                location: true,
+              },
+            },
+            sale: {
+              select: {
+                id: true,
+                date: true,
+                total: true,
+              },
+            },
+          },
+        },
+        recordedBy: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  // Count transactions for a payment
+  async countByPaymentId(paymentId: string): Promise<number> {
+    return prisma.paymentTransaction.count({
+      where: { paymentId },
+    });
+  }
+
+  // Sum of all transactions for a payment
+  async sumByPaymentId(paymentId: string): Promise<number> {
+    const result = await prisma.paymentTransaction.aggregate({
+      where: { paymentId },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    return result._sum.amount || 0;
+  }
+}
+
+export const paymentTransactionRepository = new PaymentTransactionRepository();
 
 export const paymentsRepository = new PaymentsRepository();
