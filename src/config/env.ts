@@ -18,8 +18,24 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   
-  // CORS
-  CORS_ORIGIN: z.string().url().default('http://localhost:5173'),
+  // CORS (allow comma-separated list or wildcard)
+  CORS_ORIGIN: z
+    .string()
+    .nonempty()
+    .refine(
+      (value) =>
+        value
+          .split(',')
+          .map((origin) => origin.trim())
+          .every((origin) =>
+            origin === '*' ? true : z.string().url().safeParse(origin).success
+          ),
+      {
+        message:
+          'CORS_ORIGIN must be a comma-separated list of valid URLs or "*" for all origins.',
+      }
+    )
+    .default('http://localhost:5173,http://192.168.1.12:5173'),
   
   // Logging
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
