@@ -502,16 +502,16 @@ export class PaymentsRepository {
       },
     });
 
-    // Payments received today
-    const paymentsToday = await prisma.payment.aggregate({
+    // Payment transactions received today
+    const transactionsToday = await prisma.paymentTransaction.aggregate({
       where: {
-        paidAt: {
+        createdAt: {
           gte: today,
           lt: tomorrow,
         },
       },
       _sum: {
-        paidAmount: true,
+        amount: true,
       },
       _count: true,
     });
@@ -522,8 +522,8 @@ export class PaymentsRepository {
       customersWithDebt,
       overdueCustomers,
       averageDebtAge: 0, // Will be calculated in service layer
-      totalPaymentsToday: paymentsToday._sum.paidAmount || 0,
-      paymentsReceivedToday: paymentsToday._count || 0,
+      totalPaymentsToday: transactionsToday._sum.amount || 0,
+      paymentsReceivedToday: transactionsToday._count || 0,
     };
   }
 }

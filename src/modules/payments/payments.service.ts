@@ -412,6 +412,49 @@ export class PaymentsService {
       affectedCustomers: affectedCustomers.length,
     };
   }
+
+  // Get payment transactions for a date range
+  async getPaymentTransactionsForDateRange(startDate: Date, endDate: Date) {
+    const transactions = await prisma.paymentTransaction.findMany({
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        payment: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                location: true,
+              },
+            },
+            sale: {
+              select: {
+                id: true,
+                date: true,
+                total: true,
+              },
+            },
+          },
+        },
+        recordedBy: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return transactions;
+  }
 }
 
 export const paymentsService = new PaymentsService();

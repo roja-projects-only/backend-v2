@@ -74,6 +74,7 @@ model User {
   sessions      Session[]
   settingsUpdates Setting[]
   payments      Payment[]
+  paymentTransactions PaymentTransaction[]
   reminderNotes ReminderNote[]
   
   createdAt     DateTime  @default(now())
@@ -193,11 +194,9 @@ model AuditLog {
 
 model Payment {
   id            String        @id @default(cuid())
-  amount        Float         // Amount owed or paid
+  amount        Float         // Total amount owed
   status        PaymentStatus @default(UNPAID)
-  paymentMethod PaymentMethod?
-  paidAmount    Float         @default(0)
-  paidAt        DateTime?
+  paidAmount    Float         @default(0) // Total paid so far (sum of transactions)
   dueDate       DateTime?     // When payment is expected
   notes         String?
   
@@ -209,12 +208,33 @@ model Payment {
   recordedBy    User          @relation(fields: [recordedById], references: [id])
   recordedById  String
   
+  // Payment transactions (for partial payment tracking)
+  transactions  PaymentTransaction[]
+  
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   
   @@index([customerId])
   @@index([status])
   @@index([dueDate])
+}
+
+model PaymentTransaction {
+  id            String        @id @default(cuid())
+  amount        Float         // Amount paid in this transaction
+  paymentMethod PaymentMethod @default(CASH)
+  notes         String?       // Optional note for this specific transaction
+  
+  // Relations
+  payment       Payment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId     String
+  recordedBy    User          @relation(fields: [recordedById], references: [id])
+  recordedById  String
+  
+  createdAt     DateTime      @default(now())
+  
+  @@index([paymentId])
+  @@index([createdAt])
 }
 
 model ReminderNote {

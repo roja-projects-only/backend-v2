@@ -162,14 +162,38 @@ async function main() {
         data: {
           amount: 200,
           status: PaymentStatus.PARTIAL,
-          paymentMethod: PaymentMethod.CASH,
           paidAmount: 100,
-          paidAt: new Date(oneWeekAgo.getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days after sale
           saleId: olderSale.id,
           customerId: customer.id,
           recordedById: adminUser.id,
           dueDate: oneWeekAgo,
-          notes: 'Partial payment received - ₱100 of ₱200',
+          notes: 'Partial payment - ₱100 of ₱200 paid',
+        },
+      });
+
+      // Create payment transaction for the partial payment
+      const firstPaymentDate = new Date(oneWeekAgo.getTime() + 2 * 24 * 60 * 60 * 1000); // 2 days after sale
+      await prisma.paymentTransaction.create({
+        data: {
+          amount: 50,
+          paymentMethod: PaymentMethod.CASH,
+          notes: 'First partial payment',
+          paymentId: partialPayment.id,
+          recordedById: adminUser.id,
+          createdAt: firstPaymentDate,
+        },
+      });
+
+      // Create second payment transaction
+      const secondPaymentDate = new Date(oneWeekAgo.getTime() + 4 * 24 * 60 * 60 * 1000); // 4 days after sale
+      await prisma.paymentTransaction.create({
+        data: {
+          amount: 50,
+          paymentMethod: PaymentMethod.CASH,
+          notes: 'Second partial payment',
+          paymentId: partialPayment.id,
+          recordedById: adminUser.id,
+          createdAt: secondPaymentDate,
         },
       });
 
@@ -179,7 +203,7 @@ async function main() {
         where: { id: customer.id },
         data: { 
           outstandingBalance,
-          lastPaymentDate: partialPayment.paidAt,
+          lastPaymentDate: secondPaymentDate,
         },
       });
 

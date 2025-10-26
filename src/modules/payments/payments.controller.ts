@@ -222,27 +222,24 @@ export class PaymentsController {
 
     const result = await paymentsService.getAllPayments(filters, 0, 1000);
 
-    // Filter only payments that were actually paid (have paidAt date)
-    const paidPayments = result.payments.filter(payment => 
-      payment.paidAt && 
-      payment.paidAt >= startDate && 
-      payment.paidAt <= endDate
-    );
+    // Get all payment transactions for the date range
+    const transactions = await paymentsService.getPaymentTransactionsForDateRange(startDate, endDate);
 
     const summary = {
       date,
-      totalPayments: paidPayments.length,
-      totalAmount: paidPayments.reduce((sum, payment) => sum + payment.paidAmount, 0),
-      paymentMethods: paidPayments.reduce((acc, payment) => {
-        const method = payment.paymentMethod || 'UNKNOWN';
-        acc[method] = (acc[method] || 0) + payment.paidAmount;
+      totalPayments: transactions.length,
+      totalAmount: transactions.reduce((sum, transaction) => sum + transaction.amount, 0),
+      paymentMethods: transactions.reduce((acc, transaction) => {
+        const method = transaction.paymentMethod || 'CASH';
+        acc[method] = (acc[method] || 0) + transaction.amount;
         return acc;
       }, {} as Record<string, number>),
     };
 
     const response = {
       summary,
-      payments: paidPayments,
+      payments: result.payments,
+      transactions,
       generatedAt: new Date().toISOString(),
     };
 

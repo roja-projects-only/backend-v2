@@ -160,13 +160,15 @@ export class CustomersRepository {
       _count: true,
     });
 
-    const lastPayment = await prisma.payment.findFirst({
+    // Get last payment transaction date
+    const lastTransaction = await prisma.paymentTransaction.findFirst({
       where: { 
-        customerId: id,
-        paidAt: { not: null }
+        payment: {
+          customerId: id
+        }
       },
-      orderBy: { paidAt: 'desc' },
-      select: { paidAt: true },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
     });
 
     // Get current outstanding balance
@@ -188,7 +190,7 @@ export class CustomersRepository {
       averageOrderValue,
       outstandingBalance,
       totalPayments,
-      lastPaymentDate: lastPayment?.paidAt || null,
+      lastPaymentDate: lastTransaction?.createdAt || null,
     };
   }
 
