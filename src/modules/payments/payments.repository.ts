@@ -339,7 +339,7 @@ export class PaymentsRepository {
             },
           },
           orderBy: {
-            createdAt: 'asc',
+            dueDate: 'asc', // Order by due date to get oldest overdue first
           },
         },
       },
@@ -351,7 +351,8 @@ export class PaymentsRepository {
       );
       
       const oldestPayment = customer.payments[0];
-      const oldestDebtDate = oldestPayment?.createdAt || null;
+      // Use due date for aging calculation, fall back to created date if no due date
+      const oldestDebtDate = oldestPayment?.dueDate || oldestPayment?.createdAt || null;
       const daysPastDue = oldestDebtDate 
         ? Math.floor((new Date().getTime() - oldestDebtDate.getTime()) / (1000 * 60 * 60 * 24))
         : 0;
@@ -402,7 +403,9 @@ export class PaymentsRepository {
 
       customer.payments.forEach(payment => {
         const outstandingAmount = payment.amount - payment.paidAmount;
-        const daysPastDue = Math.floor((now.getTime() - payment.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+        // Calculate days past due from the due date, not creation date
+        const dueDate = payment.dueDate || payment.createdAt;
+        const daysPastDue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
 
         if (daysPastDue <= 30) {
           current += outstandingAmount;
