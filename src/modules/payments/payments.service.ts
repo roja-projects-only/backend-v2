@@ -31,6 +31,37 @@ export class PaymentsService {
     return payment;
   }
 
+  // Get payments by IDs
+  async getPaymentsByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    
+    return prisma.payment.findMany({
+      where: {
+        id: { in: ids },
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            location: true,
+          },
+        },
+        sale: {
+          select: {
+            id: true,
+            date: true,
+            quantity: true,
+            unitPrice: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+  }
+
   // Create credit payment (when sale is marked as credit)
   async createCreditPayment(saleId: string, amount: number, customerId: string, userId: string, dueDate?: Date) {
     // Verify sale exists and is not already paid

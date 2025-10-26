@@ -214,16 +214,14 @@ export class PaymentsController {
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    // Get payments received on this date
-    const filters: PaymentFilters = {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
-    };
-
-    const result = await paymentsService.getAllPayments(filters, 0, 1000);
-
     // Get all payment transactions for the date range
     const transactions = await paymentsService.getPaymentTransactionsForDateRange(startDate, endDate);
+
+    // Get unique payment IDs from transactions
+    const paymentIds = [...new Set(transactions.map(t => t.paymentId))];
+    
+    // Get the payment records for these transactions (to show customer info, etc.)
+    const payments = await paymentsService.getPaymentsByIds(paymentIds);
 
     const summary = {
       date,
@@ -238,7 +236,7 @@ export class PaymentsController {
 
     const response = {
       summary,
-      payments: result.payments,
+      payments, // Only payments that had transactions on this date
       transactions,
       generatedAt: new Date().toISOString(),
     };
