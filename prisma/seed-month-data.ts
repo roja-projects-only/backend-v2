@@ -316,23 +316,7 @@ async function seedMonthData() {
         `  ${customer.name}: ₱${outstandingBalance.toFixed(2)} outstanding`
       );
 
-      // Add reminder notes for customers with overdue payments
-      if (collectionStatus !== CollectionStatus.ACTIVE) {
-        await prisma.reminderNote.create({
-          data: {
-            note: `Customer has ₱${outstandingBalance.toFixed(
-              2
-            )} outstanding balance. ${
-              collectionStatus === "SUSPENDED"
-                ? "Credit suspended."
-                : "Follow up needed."
-            }`,
-            reminderDate: daysAgo(2),
-            customerId: customer.id,
-            createdById: user.id,
-          },
-        });
-      }
+
     }
 
     console.log("\n📈 Summary:");

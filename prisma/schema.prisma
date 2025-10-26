@@ -75,7 +75,7 @@ model User {
   settingsUpdates Setting[]
   payments      Payment[]
   paymentTransactions PaymentTransaction[]
-  reminderNotes ReminderNote[]
+
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -99,7 +99,6 @@ model Customer {
   // Relations
   sales           Sale[]
   payments        Payment[]
-  reminderNotes   ReminderNote[]
   createdBy       User      @relation(fields: [createdById], references: [id])
   createdById     String
   
@@ -237,19 +236,4 @@ model PaymentTransaction {
   @@index([createdAt])
 }
 
-model ReminderNote {
-  id            String    @id @default(cuid())
-  note          String
-  reminderDate  DateTime  @default(now())
-  
-  // Relations
-  customer      Customer  @relation(fields: [customerId], references: [id])
-  customerId    String
-  createdBy     User      @relation(fields: [createdById], references: [id])
-  createdById   String
-  
-  createdAt     DateTime  @default(now())
-  
-  @@index([customerId])
-  @@index([reminderDate])
-}
+
