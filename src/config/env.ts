@@ -35,7 +35,7 @@ const envSchema = z.object({
           'CORS_ORIGIN must be a comma-separated list of valid URLs or "*" for all origins.',
       }
     )
-    .default('http://localhost:5173,http://192.168.1.12:5173'),
+  .default('http://localhost:5173'),
   
   // Logging
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
