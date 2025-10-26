@@ -20,7 +20,6 @@ export interface CreatePaymentDTO {
 // Update payment DTO
 export interface UpdatePaymentDTO {
   status?: PaymentStatus;
-  paymentMethod?: PaymentMethod;
   paidAmount?: number;
   paidAt?: Date;
   dueDate?: Date;

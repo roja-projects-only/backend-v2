@@ -140,7 +140,6 @@ export class PaymentsService {
     const updateData: UpdatePaymentDTO = {
       paidAmount: totalPaid,
       status: newStatus,
-      paymentMethod,
       paidAt: new Date(),
     };
 
