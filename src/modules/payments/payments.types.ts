@@ -21,7 +21,6 @@ export interface CreatePaymentDTO {
 export interface UpdatePaymentDTO {
   status?: PaymentStatus;
   paidAmount?: number;
-  paidAt?: Date;
   dueDate?: Date;
   notes?: string;
 }
@@ -190,6 +189,7 @@ export interface PaymentTransactionWithRelations {
 }
 
 // Payment transaction with running balance
-export interface PaymentTransactionWithBalance extends PaymentTransactionWithRelations {
+export interface PaymentTransactionWithBalance
+  extends PaymentTransactionWithRelations {
   runningBalance: number; // Remaining balance after this transaction
 }

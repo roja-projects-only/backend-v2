@@ -140,7 +140,6 @@ export class PaymentsService {
     const updateData: UpdatePaymentDTO = {
       paidAmount: totalPaid,
       status: newStatus,
-      paidAt: new Date(),
     };
 
     const updatedPayment = await paymentsRepository.update(paymentId, updateData);
