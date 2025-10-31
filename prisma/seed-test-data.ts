@@ -1,12 +1,12 @@
 /**
  * Test Data Seed Script
  * 
- * Generates random sales data for the current month (October 2025)
+ * Generates random sales data for 2 months (September-October 2025)
  * with customers across all locations.
  * 
  * Features:
  * - Creates 5-10 customers per location (except WALK_IN)
- * - Generates 3-7 random sales per customer for October 2025
+ * - Generates 6-14 random sales per customer across September-October 2025
  * - Realistic data patterns (more sales on weekdays, varying quantities)
  * - Easy rollback via marker customer "TEST_DATA_MARKER"
  * 
@@ -22,11 +22,12 @@ const prisma = new PrismaClient();
 // Test data configuration
 const MARKER_CUSTOMER_NAME = 'TEST_DATA_MARKER';
 const CURRENT_YEAR = 2025;
-const CURRENT_MONTH = 9; // October (0-indexed)
+const START_MONTH = 8; // September (0-indexed)
+const END_MONTH = 9; // October (0-indexed)
 const MIN_CUSTOMERS_PER_LOCATION = 5;
 const MAX_CUSTOMERS_PER_LOCATION = 10;
-const MIN_SALES_PER_CUSTOMER = 3;
-const MAX_SALES_PER_CUSTOMER = 7;
+const MIN_SALES_PER_CUSTOMER = 6; // Doubled for 2 months
+const MAX_SALES_PER_CUSTOMER = 14; // Doubled for 2 months
 const MIN_QUANTITY = 1;
 const MAX_QUANTITY = 10;
 const BASE_UNIT_PRICE = 23.00;
@@ -68,7 +69,9 @@ function generateCustomerName(): string {
   return `${randomElement(FIRST_NAMES)} ${randomElement(LAST_NAMES)}`;
 }
 
-function generateRandomDate(year: number, month: number): Date {
+function generateRandomDate(year: number, startMonth: number, endMonth: number): Date {
+  // Randomly select a month within the range
+  const month = randomInt(startMonth, endMonth);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const day = randomInt(1, daysInMonth);
   const hour = randomInt(6, 20); // Business hours 6 AM - 8 PM
@@ -115,7 +118,7 @@ async function createMarkerCustomer(adminId: string) {
 }
 
 async function seedTestData() {
-  console.log('🌱 Starting test data seed for October 2025...\n');
+  console.log('🌱 Starting test data seed for September-October 2025...\n');
   
   const admin = await getAdminUser();
   console.log(`✅ Found admin user: ${admin.username}\n`);
@@ -164,7 +167,7 @@ async function seedTestData() {
       
       totalCustomers++;
       
-      // Generate random sales for this customer in October
+      // Generate random sales for this customer across September-October
       const numSales = randomInt(MIN_SALES_PER_CUSTOMER, MAX_SALES_PER_CUSTOMER);
       const salesDates: Date[] = [];
       
@@ -175,7 +178,7 @@ async function seedTestData() {
         
         // Ensure unique dates per customer
         do {
-          saleDate = generateRandomDate(CURRENT_YEAR, CURRENT_MONTH);
+          saleDate = generateRandomDate(CURRENT_YEAR, START_MONTH, END_MONTH);
           attempts++;
         } while (
           salesDates.some(d => d.toDateString() === saleDate.toDateString()) &&
@@ -212,7 +215,7 @@ async function seedTestData() {
   console.log(`📊 Summary:`);
   console.log(`   • Customers created: ${totalCustomers}`);
   console.log(`   • Sales created: ${totalSales}`);
-  console.log(`   • Date range: October 1-31, 2025`);
+  console.log(`   • Date range: September 1 - October 31, 2025`);
   console.log(`   • Locations covered: ${locations.length}`);
   console.log('\n💡 To remove this test data, run: npm run seed:rollback\n');
   console.log('═══════════════════════════════════════════════');
