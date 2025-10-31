@@ -6,8 +6,9 @@
  * 
  * Features:
  * - Creates 5-10 customers per location (except WALK_IN)
- * - Generates 6-14 random sales per customer across September-October 2025
- * - Realistic data patterns (more sales on weekdays, varying quantities)
+ * - Generates 15-30 random sales per customer across September-October 2025
+ * - Ensures good daily coverage across all 61 days
+ * - Realistic data patterns (varying quantities, custom pricing)
  * - Easy rollback via marker customer "TEST_DATA_MARKER"
  * 
  * Usage:
@@ -26,8 +27,8 @@ const START_MONTH = 8; // September (0-indexed)
 const END_MONTH = 9; // October (0-indexed)
 const MIN_CUSTOMERS_PER_LOCATION = 5;
 const MAX_CUSTOMERS_PER_LOCATION = 10;
-const MIN_SALES_PER_CUSTOMER = 6; // Doubled for 2 months
-const MAX_SALES_PER_CUSTOMER = 14; // Doubled for 2 months
+const MIN_SALES_PER_CUSTOMER = 30; // ~25% of days covered per customer
+const MAX_SALES_PER_CUSTOMER = 30; // ~50% of days covered per customer
 const MIN_QUANTITY = 1;
 const MAX_QUANTITY = 10;
 const BASE_UNIT_PRICE = 23.00;
