@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "db:clear": "ts-node prisma/clear-data.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
