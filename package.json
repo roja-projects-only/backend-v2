@@ -11,6 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "seed:test": "ts-node prisma/seed-test-data.ts seed",
+    "seed:rollback": "ts-node prisma/seed-test-data.ts rollback",
     "db:clear": "ts-node prisma/clear-data.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
