@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,6 +5,196 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String               @id @default(cuid())
+  username           String               @unique
+  password           String
+  role               UserRole             @default(STAFF)
+  active             Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  auditLogs          AuditLog[]
+  customers          Customer[]
+  debtTransactions   DebtTransaction[]
+  Payment            Payment[]
+  PaymentTransaction PaymentTransaction[]
+  sales              Sale[]
+  sessions           Session[]
+  settingsUpdates    Setting[]
+
+  @@index([username])
+}
+
+model Customer {
+  id              String    @id @default(cuid())
+  name            String
+  location        Location
+  phone           String?
+  customUnitPrice Float?
+  notes           String?
+  active          Boolean   @default(true)
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       User      @relation(fields: [createdById], references: [id])
+  debtTabs        DebtTab[]
+  Payment         Payment[]
+  sales           Sale[]
+
+  @@index([name])
+  @@index([location])
+  @@index([createdById])
+}
+
+model Sale {
+  id          String      @id @default(cuid())
+  quantity    Float
+  unitPrice   Float
+  total       Float
+  date        DateTime
+  notes       String?
+  customerId  String
+  userId      String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  paymentType PaymentType @default(CASH)
+  Payment     Payment?
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@unique([customerId, date], name: "unique_customer_date")
+  @@index([customerId])
+  @@index([userId])
+  @@index([date])
+  @@index([paymentType])
+}
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  type        String   @default("string")
+  updatedById String
+  updatedAt   DateTime @updatedAt
+  updatedBy   User     @relation(fields: [updatedById], references: [id])
+
+  @@index([key])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  token        String   @unique
+  refreshToken String   @unique
+  expiresAt    DateTime
+  userId       String
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  action    AuditAction
+  entity    String
+  entityId  String
+  changes   Json?
+  ipAddress String?
+  userAgent String?
+  userId    String
+  timestamp DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([timestamp])
+}
+
+// Debt management models per design
+model DebtTab {
+  id            String       @id @default(cuid())
+  customerId    String
+  status        DebtStatus   @default(OPEN)
+  totalBalance  Float        @default(0)
+  openedAt      DateTime     @default(now())
+  closedAt      DateTime?
+
+  // Relations
+  customer      Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  transactions  DebtTransaction[]
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model DebtTransaction {
+  id               String              @id @default(cuid())
+  debtTabId        String
+  transactionType  DebtTransactionType
+  containers       Float?
+  unitPrice        Float?
+  amount           Float
+  balanceAfter     Float
+  notes            String?
+  adjustmentReason String?
+  transactionDate  DateTime
+
+  debtTab          DebtTab             @relation(fields: [debtTabId], references: [id], onDelete: Cascade)
+  enteredBy        User                @relation(fields: [enteredById], references: [id])
+  enteredById      String
+
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([debtTabId])
+  @@index([enteredById])
+  @@index([transactionDate])
+  @@index([transactionType])
+}
+
+model Payment {
+  id                 String               @id
+  amount             Float
+  status             PaymentStatus        @default(UNPAID)
+  paidAmount         Float                @default(0)
+  dueDate            DateTime?
+  notes              String?
+  saleId             String               @unique
+  customerId         String
+  recordedById       String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  Customer           Customer             @relation(fields: [customerId], references: [id])
+  User               User                 @relation(fields: [recordedById], references: [id])
+  Sale               Sale                 @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  PaymentTransaction PaymentTransaction[]
+
+  @@index([customerId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model PaymentTransaction {
+  id            String        @id
+  amount        Float
+  paymentMethod PaymentMethod @default(CASH)
+  notes         String?
+  paymentId     String
+  recordedById  String
+  createdAt     DateTime      @default(now())
+  Payment       Payment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  User          User          @relation(fields: [recordedById], references: [id])
+
+  @@index([createdAt])
+  @@index([paymentId])
 }
 
 enum UserRole {
@@ -25,8 +212,8 @@ enum Location {
   SAN_ISIDRO
   UPPER_LOOB
   URBAN
-  WALK_IN
   ZUNIGA
+  WALK_IN
 }
 
 enum AuditAction {
@@ -37,120 +224,29 @@ enum AuditAction {
   LOGOUT
 }
 
-model User {
-  id            String    @id @default(cuid())
-  username      String    @unique
-  password      String    // bcrypt hashed
-  role          UserRole  @default(STAFF)
-  active        Boolean   @default(true)
-  
-  // Relations
-  sales         Sale[]
-  customers     Customer[]
-  auditLogs     AuditLog[]
-  sessions      Session[]
-  settingsUpdates Setting[]
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  @@index([username])
+enum DebtStatus {
+  OPEN
+  CLOSED
 }
 
-model Customer {
-  id              String    @id @default(cuid())
-  name            String
-  location        Location
-  phone           String?
-  customUnitPrice Float?    // Optional custom price per gallon (overrides global setting)
-  notes           String?
-  active          Boolean   @default(true)
-  
-  // Relations
-  sales           Sale[]
-  createdBy       User      @relation(fields: [createdById], references: [id])
-  createdById     String
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
-  @@index([name])
-  @@index([location])
-  @@index([createdById])
+enum DebtTransactionType {
+  CHARGE
+  PAYMENT
+  ADJUSTMENT
 }
 
-model Sale {
-  id          String    @id @default(cuid())
-  quantity    Float
-  unitPrice   Float
-  total       Float
-  date        DateTime
-  notes       String?
-  
-  // Relations
-  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId  String
-  user        User      @relation(fields: [userId], references: [id])
-  userId      String
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  @@unique([customerId, date(sort: Asc)], name: "unique_customer_date")
-  @@index([customerId])
-  @@index([userId])
-  @@index([date])
+enum PaymentMethod {
+  CASH
 }
 
-model Setting {
-  id        String    @id @default(cuid())
-  key       String    @unique
-  value     String
-  type      String    @default("string") // string, number, boolean, json
-  
-  // Relations
-  updatedBy User      @relation(fields: [updatedById], references: [id])
-  updatedById String
-  
-  updatedAt DateTime  @updatedAt
-  
-  @@index([key])
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  OVERDUE
 }
 
-model Session {
-  id           String    @id @default(cuid())
-  token        String    @unique
-  refreshToken String    @unique
-  expiresAt    DateTime
-  
-  // Relations
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       String
-  
-  createdAt    DateTime  @default(now())
-  lastUsedAt   DateTime  @default(now())
-  
-  @@index([userId])
-  @@index([token])
-  @@index([expiresAt])
-}
-
-model AuditLog {
-  id          String      @id @default(cuid())
-  action      AuditAction
-  entity      String      // "User", "Customer", "Sale", "Setting"
-  entityId    String
-  changes     Json?       // Before/after state
-  ipAddress   String?
-  userAgent   String?
-  
-  // Relations
-  user        User        @relation(fields: [userId], references: [id])
-  userId      String
-  
-  timestamp   DateTime    @default(now())
-  
-  @@index([userId])
-  @@index([entity, entityId])
-  @@index([timestamp])
+enum PaymentType {
+  CASH
+  CREDIT
 }
