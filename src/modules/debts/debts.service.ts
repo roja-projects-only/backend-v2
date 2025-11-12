@@ -55,7 +55,7 @@ class DebtsService {
     return val;
   }
 
-  private async findOrCreateOpenTab(customerId: string, tx: Prisma.TransactionClient) {
+  private async findOrCreateOpenTab(customerId: string, tx: Prisma.TransactionClient, userId: string) {
     let tab = await tx.debtTab.findFirst({ where: { customerId, status: DebtStatus.OPEN } });
     if (!tab) {
       tab = await tx.debtTab.create({
@@ -65,13 +65,14 @@ class DebtsService {
           totalBalance: 0,
         },
       });
-      await prisma.auditLog.create({
+      // Record audit log with the actual user performing the action
+      await tx.auditLog.create({
         data: {
           action: 'CREATE',
           entity: 'DebtTab',
           entityId: tab.id,
           changes: { customerId } as any,
-          userId: 'system',
+          userId,
         },
       });
     }
@@ -87,7 +88,7 @@ class DebtsService {
     const amount = input.containers * unitPrice;
 
     const result = await prisma.$transaction(async (tx) => {
-      const tab = await this.findOrCreateOpenTab(input.customerId, tx);
+      const tab = await this.findOrCreateOpenTab(input.customerId, tx, userId);
       const newBalance = tab.totalBalance + amount;
 
       const trx = await tx.debtTransaction.create({
