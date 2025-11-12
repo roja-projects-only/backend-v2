@@ -322,6 +322,7 @@ class DebtsService {
       ? await prisma.debtTransaction.findMany({
           where: { debtTabId: tab.id },
           orderBy: { transactionDate: 'desc' },
+          include: { enteredBy: { select: { id: true, username: true } } },
         })
       : [];
 
@@ -339,6 +340,7 @@ class DebtsService {
       ? await prisma.debtTransaction.findMany({
           where: { debtTabId: { in: tabIds } },
           orderBy: { transactionDate: 'desc' },
+          include: { enteredBy: { select: { id: true, username: true } } },
         })
       : [];
 
