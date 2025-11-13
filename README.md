@@ -2,7 +2,7 @@
 
 > **Part of Polyrepo**: [Frontend Repository](https://github.com/walaywashere/ledger-v2-frontend) | [Migration Guide](https://github.com/walaywashere/ledger-v2/blob/main/POLYREPO_MIGRATION.md)
 
-Express.js + Prisma + PostgreSQL backend API for a family-run water refilling business sales tracking system.
+Express.js + Prisma + PostgreSQL backend API for a family-run water refilling business sales tracking system. The backend is the single source of truth for sales, debts, customers, users, and configuration data consumed by the React frontend.
 
 ## 🚀 Quick Start
 
@@ -39,27 +39,29 @@ Server runs at: `http://localhost:3000`
 - Session management
 
 ### Core Modules
-- **Sales**: Track gallon sales with upsert behavior (one per customer per day)
-- **Customers**: Manage customer records with custom pricing
-- **Settings**: Key-value store for app configuration
-- **Users**: User management (max 3 concurrent users)
-- **Audit Logs**: Track all mutations for accountability
+- **Sales**: Track container sales with upsert behavior (one sale per customer per day) and Manila-aware date range queries
+- **Customers**: Manage customer records, locations, activity state, and optional `customUnitPrice`
+- **Settings**: Key-value store for app configuration (unit price, custom pricing toggle, business info)
+- **Users**: User management (max 3 concurrent users) with role-based access and passcode rotation
+- **Debts**: Manage running tabs, charges, payments, and adjustments for customers with audit trails
+- **Audit Logs**: Persist mutation history for all write operations
 
 ### API Endpoints (34 total)
 - **Auth** (6): login, logout, refresh, me, register, change-password
-- **Sales** (11): CRUD + analytics (today, by-date, by-customer, stats)
-- **Customers** (8): CRUD + search, stats, history
-- **Settings** (8): CRUD + bulk operations
-- **Users** (7): CRUD + deactivation, current user
+- **Sales** (11): CRUD + analytics (today, by-date, by-customer, stats) with inclusive `[start, end+1 day)` windows
+- **Customers** (8): CRUD + search, stats, history, and pricing metadata
+- **Settings** (8): CRUD + bulk operations for key-value config
+- **Users** (7): CRUD + deactivation, current user, passcode maintenance
+- **Debts** (6): Charges, payments, adjustments, close-tab flow, history, and customer debt snapshots
 
 ## 🛠️ Tech Stack
 
 - **Runtime**: Node.js 20+ with TypeScript
-- **Framework**: Express.js
+- **Framework**: Express.js (layered: routes → controllers → services → repositories)
 - **Database**: PostgreSQL 17+ via Prisma ORM
 - **Authentication**: JWT (jsonwebtoken) + bcrypt
-- **Validation**: Zod schemas
-- **Logging**: Winston
+- **Validation**: Zod schemas (request DTO normalization + date parsing)
+- **Logging**: Winston + Prisma audit logs
 - **Deployment**: Railway-ready
 
 ## 📁 Project Structure
@@ -67,21 +69,20 @@ Server runs at: `http://localhost:3000`
 ```
 backend-v2/
 ├── src/
-│   ├── modules/          # Feature modules (auth, sales, customers, etc.)
-│   │   ├── auth/         # Authentication module
-│   │   ├── sales/        # Sales tracking
-│   │   ├── customers/    # Customer management
-│   │   ├── settings/     # App settings
-│   │   └── users/        # User management
-│   ├── middleware/       # Express middleware (auth, cors, error handling)
+│   ├── modules/          # Feature modules (auth, sales, customers, debts, settings, users)
+│   │   ├── <feature>.routes.ts     # Express routes (validation + auth guards)
+│   │   ├── <feature>.controller.ts # Translate HTTP → service calls, normalize responses
+│   │   ├── <feature>.service.ts    # Business rules, audit logging, retries
+│   │   └── <feature>.repository.ts # Prisma queries (datastore layer)
+│   ├── middleware/       # Express middleware (auth, cors, request logging, validation)
 │   ├── config/           # Configuration (database, env, logger)
-│   ├── utils/            # Utilities (errors, pagination, response)
-│   └── app.ts            # Express app setup
+│   ├── utils/            # Utilities (errors, pagination, response helpers)
+│   └── app.ts            # Express app setup and route mounting
 ├── prisma/
-│   ├── schema.prisma     # Database schema
-│   ├── seed.ts           # Database seeder
-│   └── migrations/       # Migration history
-└── TESTING/              # API test plans and scripts
+│   ├── schema.prisma     # Database schema and relations
+│   ├── seed.ts           # Database seeder for baseline settings/users/customers
+│   └── migrations/       # Migration history, locked via migration_lock.toml
+└── TESTING/              # API test plans and scripts (customers, sales, settings, users)
 ```
 
 ## 🔧 Environment Variables
@@ -109,41 +110,64 @@ CORS_ORIGIN="http://localhost:5173"
 - Production: `https://your-backend.railway.app/api`
 
 ### Authentication
-All endpoints except `/auth/login` and `/auth/register` require JWT token:
-```bash
+All endpoints except `/auth/login` and `/auth/register` require a Bearer token (15-minute access tokens with refresh rotation).
+
+```
 Authorization: Bearer <access_token>
 ```
 
 ### Response Format
+
 ```json
 {
   "success": true,
-  "data": { ... },
-  "pagination": { ... }  // Optional for list endpoints
+  "data": {...},
+  "pagination": {...}
 }
 ```
 
-### Key Endpoints
+- `data` contains the domain payload (single resource or list).
+- `pagination` appears on endpoints returning paginated lists.
+
+### Key Endpoint Flows
 
 **Auth**
-- `POST /auth/login` - Login with username/passcode
-- `POST /auth/refresh` - Refresh access token
-- `GET /auth/me` - Get current user
+- `POST /auth/login` — Username + passcode; returns access + refresh tokens
+- `POST /auth/refresh` — Rotates access token using refresh token cookie/header
+- `GET /auth/me` — Returns authenticated user with role and status
 
 **Sales**
-- `GET /sales` - List all sales (paginated)
-- `POST /sales` - Create/update sale (upsert)
-- `GET /sales/today` - Get today's sales
-- `GET /sales/date/:date` - Get sales by date
-- `GET /sales/customer/:id` - Get customer's sales history
+- `GET /sales` — Paginated list filtered by customer, user, or ISO date range (inclusive end date)
+- `POST /sales` — Upsert sale by `(customerId, date)`; enforces single daily sale per customer
+- `GET /sales/today` — Convenience endpoint for Manila “today” window
+- `GET /sales/date/:date` — Day snapshot (expects `YYYY-MM-DD`)
+- `GET /sales/customer/:id` — Customer history with recalculated totals
 
 **Customers**
-- `GET /customers` - List all customers (paginated)
-- `POST /customers` - Create customer
-- `GET /customers/:id` - Get customer details
-- `GET /customers/:id/stats` - Get customer statistics
+- `GET /customers` — Paginated, filterable by search/location/active
+- `POST /customers` — Creates new customer, defaulting `customUnitPrice` to null
+- `PATCH /customers/:id` — Updates metadata and optional pricing overrides
+- `GET /customers/:id/stats` — Aggregate view (sales count, last purchase, debts)
 
-See [TESTING/](./TESTING/) for complete API documentation and test scripts.
+**Debts**
+- `POST /debts/charge` — Adds containers to an open tab, creating one if needed
+- `POST /debts/payment` — Records payment and auto-closes tab at zero balance
+- `POST /debts/adjustment` — Positive/negative adjustments with reason auditing
+- `POST /debts/mark-paid` — Closes tab, optionally posting a final payment
+- `GET /debts/customer/:id` — Current tab snapshot + recent activity
+- `GET /debts/history` — Paginated ledger with filters by customer, status, type, and ISO date range
+
+**Settings**
+- `GET /settings` — Returns key/value pairs with parsed types
+- `PUT /settings/:key` — Updates existing setting with audit logs
+- `POST /settings/bulk` — Upserts multiple settings atomically (e.g., toggle + price)
+
+**Users**
+- `GET /users` — Paginated staff/admin list
+- `POST /users` — Admin-only creation of new staff members
+- `PATCH /users/:id` — Toggle active flag, update role, or reset passcode
+
+See [TESTING/](./TESTING/) for endpoint-specific payloads and scripted smoke checks.
 
 ## 🧪 Testing
 
@@ -192,17 +216,19 @@ The frontend supports **per-customer custom pricing** with a global toggle:
 ## 📝 Development Notes
 
 ### Architectural Decisions
-- **Layered Architecture**: Routes → Controllers → Services → Repository
-- **300-line Rule**: Keep files small and focused
-- **Response Adapters**: Consistent API response format
-- **Upsert Pattern**: One sale per customer per day (auto-updates)
+- **Layered Architecture**: Routes → Controllers → Services → Repositories → Prisma
+- **300-line Rule**: Keep files small and focused; extract helpers when business logic grows
+- **Request Validation**: Zod schemas transform ISO strings into `Date` objects before hitting services
+- **Response Helpers**: `sendSuccess` and error middleware enforce consistent JSON envelopes
+- **Upsert Pattern**: Sales module ensures one sale per customer per day; debts module ensures single open tab per customer
 
-### Database Schema
-- Users: Admin/Staff roles with bcrypt passwords
-- Customers: Location-based with optional custom pricing
-- Sales: Linked to customers and users with audit trail
-- Settings: Key-value store with type validation
-- AuditLogs: Track all mutations with user/IP/changes
+### Database Schema Highlights
+- **Users**: Admin/staff roles with bcrypt-hashed passcodes and active flag enforcement
+- **Customers**: Location metadata, optional `customUnitPrice`, status flags, historical stats
+- **Sales**: Linked to customers/users, stores quantity and stored total (frontend recalculates effective totals)
+- **Debts**: `DebtTab` (open/closed tabs) + `DebtTransaction` (charges/payments/adjustments)
+- **Settings**: Stringified key-value store with type metadata (`string | number | boolean | json`)
+- **AuditLogs**: Records every mutation with actor, payload snapshot, user agent/IP when available
 
 ## 📄 License
 

@@ -3,7 +3,7 @@
 > **Part of**: [Water Refilling Ledger Backend](https://github.com/walaywashere/ledger-v2-backend)  
 > **Frontend Repository**: https://github.com/walaywashere/ledger-v2-frontend
 
-Express.js + Prisma + PostgreSQL backend setup guide for Railway deployment.
+Express.js + Prisma + PostgreSQL backend setup guide for Railway deployment. This document mirrors the current code base (routes → controllers → services → repositories) so new agents can provision infrastructure without surprises.
 
 ---
 
@@ -51,9 +51,9 @@ npm run prisma:migrate
 ```
 
 This will:
-- Create all database tables (User, Customer, Sale, Setting, Session, AuditLog)
-- Apply indexes for performance (customerId, userId, date)
-- Set up foreign key relationships
+- Create all database tables (User, Customer, Sale, DebtTab, DebtTransaction, Setting, Session, AuditLog)
+- Apply indexes for performance (customerId, userId, date, debtTabId)
+- Set up foreign key relationships (including cascades for audit/session records)
 - Create unique constraint for one sale per customer per day
 
 ## Step 5: Seed Initial Data
@@ -64,7 +64,8 @@ npm run prisma:seed
 
 This creates:
 - **Admin user**: username `admin`, passcode `000000`
-- **Default settings**: unitPrice = 25.00, businessName = "Yaris Ledger"
+- **Default settings**: `unitPrice = 25.00`, `businessName = "Yaris Ledger"`, `enableCustomPricing = true`
+- **Reference customers**: Sample customers/locations for frontend dropdowns
 
 **⚠️ Important**: Change the admin passcode after first login!
 
@@ -149,7 +150,7 @@ npm run prisma:seed
 
 Railway databases sleep after inactivity. First request might be slow.
 
-**Solution**: The server will retry connections automatically.
+**Solution**: The Prisma client auto-retries with exponential backoff; simply retry the request.
 
 ### SSL Required Error
 
@@ -162,7 +163,7 @@ DATABASE_URL="postgresql://user:pass@host:port/db?sslmode=require"
 
 ### Migration Failed
 
-If migration fails mid-way, reset and retry:
+If migration fails mid-way, reset and retry (development only):
 
 ```powershell
 npx prisma migrate reset
@@ -170,7 +171,7 @@ npm run prisma:migrate
 npm run prisma:seed
 ```
 
-**⚠️ Warning**: This deletes all data. Only use in development.
+**⚠️ Warning**: `prisma migrate reset` drops the database. Never run it against production.
 
 ### Prisma Client Out of Sync
 
@@ -235,6 +236,8 @@ railway run npm run prisma:migrate
 railway run npm run prisma:seed
 ```
 
+`prisma:seed` is idempotent and safe to rerun; it upserts default settings and ensures the admin account exists.
+
 ### 4. Enable Custom Domain (Optional)
 
 1. Go to Railway project settings
@@ -258,8 +261,8 @@ railway run npm run prisma:seed
 
 ### 3. Scaling
 - Railway PostgreSQL can be upgraded to larger instances
-- Monitor connection pool usage (default: 10 connections)
-- Consider read replicas for high traffic
+- Monitor connection pool usage (default: 10 connections); adjust `PRISMA_CLIENT_ENGINE_MAX_REQUESTS` if needed
+- Consider read replicas for high traffic analytics workloads
 
 ### 4. Monitoring
 - Check Railway metrics dashboard
@@ -280,17 +283,19 @@ railway run npm run prisma:seed
 ## Database Schema
 
 ### Tables
-- **User** - System users (admin/staff)
-- **Customer** - Water refilling customers
-- **Sale** - Daily gallon sales (unique per customer per day)
-- **Setting** - Key-value config (unitPrice, businessName, etc.)
-- **Session** - JWT refresh token storage
-- **AuditLog** - Activity tracking (JSONB changes)
+- **User** — System users (admin/staff) with active flag and audit metadata
+- **Customer** — Water refilling customers with locations and optional `customUnitPrice`
+- **Sale** — Daily container sales (unique per customer per day)
+- **DebtTab** — Open/closed running tabs per customer
+- **DebtTransaction** — Charges, payments, adjustments with running balances
+- **Setting** — Key-value config (unit price, pricing toggle, business details)
+- **Session** — JWT refresh token storage
+- **AuditLog** — Activity tracking (JSONB changes)
 
 ### Key Constraints
-- `unique_customer_date` - One sale per customer per day
-- Foreign keys with cascade deletes (sessions, audit logs)
-- Indexes on frequently queried fields
+- `unique_customer_date` — One sale per customer per day (enforced by migration `add_unique_customer_date_constraint`)
+- Foreign keys with cascades on dependent tables (sessions, audit logs, debt transactions)
+- Indexes on frequently queried fields (`customerId`, `userId`, `date`, `debtTabId`)
 
 ---
 
@@ -330,57 +335,63 @@ npm run prisma:seed
 
 ---
 
-## API Endpoints
+## API Endpoint Overview
 
-### Authentication (6 endpoints)
-- `POST /api/auth/login` - Login with username/passcode
-- `POST /api/auth/logout` - Logout (invalidate tokens)
-- `POST /api/auth/refresh` - Refresh access token
-- `GET /api/auth/me` - Get current user
-- `POST /api/auth/change-passcode` - Change own passcode
-- `POST /api/auth/validate` - Validate access token
+The codebase groups endpoints by module (`src/modules/<feature>`). Each route file is the authoritative source. Highlights:
 
-### Customers (8 endpoints)
-- `GET /api/customers` - List all customers (pagination)
-- `GET /api/customers/:id` - Get customer by ID
-- `POST /api/customers` - Create customer
-- `PUT /api/customers/:id` - Update customer
-- `DELETE /api/customers/:id` - Delete customer (soft delete)
-- `GET /api/customers/location/:location` - Filter by location
-- `GET /api/customers/search` - Search by name/phone
-- `GET /api/customers/:id/sales` - Get customer sales history
+### Authentication
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `POST /api/auth/refresh`
+- `GET /api/auth/me`
+- `POST /api/auth/change-passcode`
 
-### Sales (11 endpoints)
-- `GET /api/sales` - List all sales (pagination)
-- `GET /api/sales/:id` - Get sale by ID
-- `POST /api/sales` - Create/update sale (upsert logic)
-- `PUT /api/sales/:id` - Update sale
-- `DELETE /api/sales/:id` - Delete sale
-- `GET /api/sales/today` - Today's sales
-- `GET /api/sales/date/:date` - Sales by date
-- `GET /api/sales/customer/:customerId` - Customer sales
-- `GET /api/sales/location/:location` - Location sales
-- `GET /api/sales/date-range` - Sales between dates
-- `GET /api/sales/analytics/kpis` - KPI calculations
+### Customers
+- `GET /api/customers` — Filter by status/location/search
+- `GET /api/customers/locations` — All distinct locations
+- `GET /api/customers/:id`
+- `POST /api/customers`
+- `PUT /api/customers/:id`
+- `DELETE /api/customers/:id` — Admin only (soft delete)
+- `POST /api/customers/:id/restore` — Admin only
+- `GET /api/customers/:id/stats`
 
-### Settings (8 endpoints)
-- `GET /api/settings` - Get all settings
-- `GET /api/settings/:key` - Get setting by key
-- `POST /api/settings` - Create setting
-- `PUT /api/settings/:key` - Update setting
-- `DELETE /api/settings/:key` - Delete setting
-- `POST /api/settings/bulk` - Bulk update settings
-- `GET /api/settings/defaults` - Get default settings
-- `POST /api/settings/reset` - Reset to defaults (admin only)
+### Sales
+- `GET /api/sales` — Supports `date`, `startDate`, `endDate`, `customerId`, `userId`
+- `GET /api/sales/today`
+- `GET /api/sales/date/:date`
+- `GET /api/sales/analytics/daily-trend`
+- `GET /api/sales/analytics/location-performance`
+- `GET /api/sales/analytics/summary`
+- `GET /api/sales/customer/:customerId/history`
+- `GET /api/sales/:id`
+- `POST /api/sales`
+- `PATCH /api/sales/:id`
+- `DELETE /api/sales/:id`
 
-### Users (7 endpoints)
-- `GET /api/users` - List all users (admin only)
-- `GET /api/users/:id` - Get user by ID
-- `POST /api/users` - Create user (admin only, max 3 users)
-- `PUT /api/users/:id` - Update user (admin only)
-- `DELETE /api/users/:id` - Deactivate user (admin only)
-- `PUT /api/users/:id/activate` - Reactivate user (admin only)
-- `GET /api/users/active` - List active users
+### Debts
+- `POST /api/debts/charge`
+- `POST /api/debts/payment`
+- `POST /api/debts/adjustment`
+- `POST /api/debts/mark-paid`
+- `GET /api/debts/customer/:customerId`
+- `GET /api/debts/history`
+
+### Settings
+- `GET /api/settings`
+- `GET /api/settings/:key`
+- `PUT /api/settings/:key`
+- `POST /api/settings/bulk`
+- `DELETE /api/settings/:key`
+
+### Users (Admin-only)
+- `GET /api/users/stats`
+- `GET /api/users`
+- `GET /api/users/:id`
+- `POST /api/users`
+- `PATCH /api/users/:id`
+- `DELETE /api/users/:id`
+- `POST /api/users/:id/change-password`
 
 ---
 
