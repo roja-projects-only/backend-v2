@@ -3,34 +3,44 @@ import { z } from 'zod';
 // User role enum
 const userRoleSchema = z.enum(['ADMIN', 'STAFF']);
 
-// Create user schema
-export const createUserSchema = z.object({
+// Helper for 6-digit numeric string
+const sixDigit = z.string()
+  .length(6, 'Passcode must be exactly 6 digits')
+  .regex(/^\d{6}$/, 'Passcode must be 6 digits');
+
+// Create user schema - accept either `password` or `passcode`, normalize to `password`
+export const createUserSchema = z.preprocess((val) => {
+  const obj = val as any;
+  if (obj && obj.passcode && !obj.password) {
+    return { ...obj, password: obj.passcode };
+  }
+  return val;
+}, z.object({
   username: z.string()
     .min(3, 'Username must be at least 3 characters')
     .max(30, 'Username must not exceed 30 characters')
     .regex(/^[a-zA-Z0-9_-]+$/, 'Username must contain only letters, numbers, underscores, and hyphens'),
-  password: z.string()
-    .min(6, 'Password must be at least 6 characters')
-    .max(6, 'Password must be exactly 6 characters')
-    .regex(/^\d{6}$/, 'Password must be a 6-digit number'),
+  password: sixDigit,
   role: userRoleSchema,
-});
+}));
 
-// Update user schema
-export const updateUserSchema = z.object({
+// Update user schema - also accept passcode and normalize
+export const updateUserSchema = z.preprocess((val) => {
+  const obj = val as any;
+  if (obj && obj.passcode && !obj.password) {
+    return { ...obj, password: obj.passcode };
+  }
+  return val;
+}, z.object({
   username: z.string()
     .min(3, 'Username must be at least 3 characters')
     .max(30, 'Username must not exceed 30 characters')
     .regex(/^[a-zA-Z0-9_-]+$/, 'Username must contain only letters, numbers, underscores, and hyphens')
     .optional(),
-  password: z.string()
-    .min(6, 'Password must be at least 6 characters')
-    .max(6, 'Password must be exactly 6 characters')
-    .regex(/^\d{6}$/, 'Password must be a 6-digit number')
-    .optional(),
+  password: sixDigit.optional(),
   role: userRoleSchema.optional(),
   active: z.boolean().optional(),
-});
+}));
 
 // User ID schema
 export const userIdSchema = z.object({

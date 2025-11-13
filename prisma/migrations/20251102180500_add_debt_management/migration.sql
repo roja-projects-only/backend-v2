@@ -1,0 +1,3 @@
+-- Placeholder migration: add_debt_management
+-- Remote DB already contains intermediate debt/payment structures.
+-- This placeholder ensures migration history continuity.

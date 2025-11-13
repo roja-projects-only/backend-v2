@@ -9,6 +9,7 @@ import customersRoutes from './modules/customers/customers.routes';
 import salesRoutes from './modules/sales/sales.routes';
 import settingsRoutes from './modules/settings/settings.routes';
 import usersRoutes from './modules/users/users.routes';
+import debtsRoutes from './modules/debts/debts.routes';
 
 // Create Express app
 const app: Application = express();
@@ -40,6 +41,7 @@ app.use('/api/customers', customersRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/debts', debtsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

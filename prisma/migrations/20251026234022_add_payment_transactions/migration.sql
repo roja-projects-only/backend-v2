@@ -1,0 +1,2 @@
+-- Placeholder migration: add_payment_transactions
+-- Aligning local migration history; no SQL needed.
