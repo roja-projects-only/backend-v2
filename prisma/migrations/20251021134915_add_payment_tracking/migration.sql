@@ -1,0 +1,3 @@
+-- Placeholder for production-applied migration: add_payment_tracking
+-- This placeholder aligns local migration history with the remote DB.
+-- No-op; schema was previously applied outside of migrations.

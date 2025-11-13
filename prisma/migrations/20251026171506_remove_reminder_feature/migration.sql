@@ -1,0 +1,2 @@
+-- Placeholder migration: remove_reminder_feature
+-- Original migration applied remotely; representing as no-op locally.
